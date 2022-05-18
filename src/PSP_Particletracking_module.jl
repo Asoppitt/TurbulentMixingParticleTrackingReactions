@@ -43,7 +43,7 @@ struct MotionParams{T<:AbstractFloat}
     u_mean::T
 end
 
-struct BCParams{T<:AbstractFloat, Tvp<:Real, T_corr<:Union{Nothing, Function, Tuple{Function,Function}}, bc_CLT}
+struct BCParams{T<:AbstractFloat, Tvp<:Real, T_corr<:Union{Nothing, Function, Tuple{Function,Function}}, binary}
     bc_k::T
     C_0::T
     B::T
@@ -73,28 +73,33 @@ function motion_params(omega_bar::T,C_0::T, B_format::String, u_mean::T) where T
     end
 end
 
-function BC_params(bc_k::T, C_0::T, B_format::String, num_vp::Tvp, bc_CLT::Bool; corr_func::T_corr=nothing, reacting_boundaries::AbstractArray{String}=["lower"]) where T<:AbstractFloat where Tvp<:Int where T_corr<:Union{Nothing, Function, Tuple{Function,Function}}
+function BC_params(bc_k::T, C_0::T, B_format::String, num_vp::Tvp; corr_func::T_corr=nothing, reacting_boundaries::AbstractArray{String}=["lower"]) where T<:AbstractFloat where Tvp<:Int where T_corr<:Union{Nothing, Function, Tuple{Function,Function}}
+    if num_vp==1
+        binary=true
+    else
+        binary=false
+    end
     boundary_names=["upper", "lower", "right", "left"]
     reacting_boundaries=lowercase.(reacting_boundaries)
     any(.!in.(reacting_boundaries,[boundary_names])) && @warn "invalid boundary names:" *join(reacting_boundaries[.!in.(reacting_boundaries,[boundary_names])] , ", ")*"\ncontinuing using valid boundaries"
     reacting_boundaries_ind = in.(boundary_names,[reacting_boundaries])
     if B_format == "Decay"
-        return BCParams{T,Tvp,T_corr,bc_CLT}(bc_k, C_0, (1+T(1.5)*C_0),num_vp,corr_func,reacting_boundaries_ind)
+        return BCParams{T,Tvp,T_corr,binary}(bc_k, C_0, (1+T(1.5)*C_0),num_vp,corr_func,reacting_boundaries_ind)
     elseif B_format == "Constant"
-        return BCParams{T,Tvp,T_corr,bc_CLT}(bc_k, C_0, (T(1.5)*C_0),num_vp,corr_func,reacting_boundaries_ind)
+        return BCParams{T,Tvp,T_corr,binary}(bc_k, C_0, (T(1.5)*C_0),num_vp,corr_func,reacting_boundaries_ind)
     end
 end
 
-function BC_params(bc_k::T, C_0::T, B_format::String, num_vp::Tvp, bc_CLT::Bool; corr_func::T_corr=nothing, reacting_boundaries::AbstractArray{String}=["lower"]) where T<:AbstractFloat where Tvp<:AbstractFloat where T_corr<:Union{Nothing, Function}
+function BC_params(bc_k::T, C_0::T, B_format::String, num_vp::Tvp; corr_func::T_corr=nothing, reacting_boundaries::AbstractArray{String}=["lower"]) where T<:AbstractFloat where Tvp<:AbstractFloat where T_corr<:Union{Nothing, Function}
     boundary_names=["upper", "lower", "right", "left"]
     reacting_boundaries=lowercase.(reacting_boundaries)
     any(.!in.(reacting_boundaries,[boundary_names])) && @warn "invalid boundary names:" *join(reacting_boundaries[.!in.(reacting_boundaries,[boundary_names])] , ", ")*"\ncontinuing using valid boundaries"
     reacting_boundaries_ind = in.(boundary_names,[reacting_boundaries])
     num_vp == Inf || throw(DomainError("nvpart_per_part must be Int or Inf"))
     if B_format == "Decay"
-        return BCParams{T,Tvp,T_corr,bc_CLT}(bc_k, C_0, (1+T(1.5)*C_0),num_vp,corr_func,reacting_boundaries_ind)
+        return BCParams{T,Tvp,T_corr,false}(bc_k, C_0, (1+T(1.5)*C_0),num_vp,corr_func,reacting_boundaries_ind)
     elseif B_format == "Constant"
-        return BCParams{T,Tvp,T_corr,bc_CLT}(bc_k, C_0, (T(1.5)*C_0),num_vp,corr_func,reacting_boundaries_ind)
+        return BCParams{T,Tvp,T_corr,false}(bc_k, C_0, (T(1.5)*C_0),num_vp,corr_func,reacting_boundaries_ind)
     end
 end
 
@@ -663,36 +668,37 @@ end
 
 ####Not being updated ####
 #using binomal noise for small numbers of vparticles
-function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, turb_k_e::Vector{TF}, bc_params::BCParams{TF,Int, Nothing,false}, t_index::Int) where TF<:AbstractFloat
-    n_abs = sum(abs_points)
-    abs_k = bc_params.bc_k.*ones(TF,2,n_abs)
-    effective_v_particles =( phip[:,abs_points,t_index].*bc_params.num_vp)
-    #K for Erban and Chapman approximation 
-    P = zeros(TF,2,n_abs)
-    P[1,:] = min.(abs_k[1,:].*sqrt.(bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
-    P[2,:] = min.(abs_k[2,:].*sqrt.(bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
-    #Binomal dist for number of virtual particles to have reacted
-    xi_dist = Binomial.(ceil.(effective_v_particles),1 .-P)
-    xi = [rand(xi_dist[i,j]) for i in 1:2, j in 1:n_abs]
-    ratios = [effective_v_particles[i,j]>0 ? xi[i,j]./ceil.(effective_v_particles[i,j]) : 0 for i in 1:2, j in 1:n_abs]
-    phip[:, abs_points, t_index] = phip[:, abs_points, t_index].*ratios
-    return nothing
-end
+#disabled to allow precomp to work
+# function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, turb_k_e::Vector{TF}, bc_params::BCParams{TF,Int, Nothing,false}, t_index::Int) where TF<:AbstractFloat
+#     n_abs = sum(abs_points)
+#     abs_k = bc_params.bc_k.*ones(TF,2,n_abs)
+#     effective_v_particles =( phip[:,abs_points,t_index].*bc_params.num_vp)
+#     #K for Erban and Chapman approximation 
+#     P = zeros(TF,2,n_abs)
+#     P[1,:] = min.(abs_k[1,:].*sqrt.(bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
+#     P[2,:] = min.(abs_k[2,:].*sqrt.(bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
+#     #Binomal dist for number of virtual particles to have reacted
+#     xi_dist = Binomial.(ceil.(effective_v_particles),1 .-P)
+#     xi = [rand(xi_dist[i,j]) for i in 1:2, j in 1:n_abs]
+#     ratios = [effective_v_particles[i,j]>0 ? xi[i,j]./ceil.(effective_v_particles[i,j]) : 0 for i in 1:2, j in 1:n_abs]
+#     phip[:, abs_points, t_index] = phip[:, abs_points, t_index].*ratios
+#     return nothing
+# end
 
-#binomal precomp
-function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, bc_params::BCParams{TF,Int, Nothing,false}, t_index::Int, Precomp_P::TF) where TF<:AbstractFloat
-    n_abs = sum(abs_points)
-    effective_v_particles =( phip[:,abs_points,t_index].*bc_params.num_vp)
-    #K for Erban and Chapman approximation 
-    P = zeros(TF,2,n_abs)
-    P .= Precomp_P
-    #Binomal dist for number of virtual particles to have reacted
-    xi_dist = Binomial.(ceil.(effective_v_particles),1 .-P)
-    xi = [rand(xi_dist[i,j]) for i in 1:2, j in 1:n_abs]
-    ratios = [effective_v_particles[i,j]>0 ? xi[i,j]./ceil.(effective_v_particles[i,j]) : 0 for i in 1:2, j in 1:n_abs]
-    phip[:, abs_points, t_index] = phip[:, abs_points, t_index].*ratios
-    return nothing
-end
+# #binomal precomp
+# function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, bc_params::BCParams{TF,Int, Nothing,false}, t_index::Int, Precomp_P::TF) where TF<:AbstractFloat
+#     n_abs = sum(abs_points)
+#     effective_v_particles =( phip[:,abs_points,t_index].*bc_params.num_vp)
+#     #K for Erban and Chapman approximation 
+#     P = zeros(TF,2,n_abs)
+#     P .= Precomp_P
+#     #Binomal dist for number of virtual particles to have reacted
+#     xi_dist = Binomial.(ceil.(effective_v_particles),1 .-P)
+#     xi = [rand(xi_dist[i,j]) for i in 1:2, j in 1:n_abs]
+#     ratios = [effective_v_particles[i,j]>0 ? xi[i,j]./ceil.(effective_v_particles[i,j]) : 0 for i in 1:2, j in 1:n_abs]
+#     phip[:, abs_points, t_index] = phip[:, abs_points, t_index].*ratios
+#     return nothing
+# end
 
 #binary Precomp, need to edit this file to enable this, (comment out binomal precomp)
 function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, bc_params::BCParams{TF,Int, Nothing,false}, t_index::Int, Precomp_P::TF) where TF<:AbstractFloat 
