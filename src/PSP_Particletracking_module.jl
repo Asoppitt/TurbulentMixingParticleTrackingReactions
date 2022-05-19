@@ -103,8 +103,8 @@ function BC_params(bc_k::T, C_0::T, B_format::String, num_vp::Tvp; corr_func::T_
     end
 end
 
-function PSP_motion_bc_params(omega_bar::T, omega_sigma_2::T,omega_min::T, C_0::T, B_format::String, c_phi::T, c_t::T,u_mean::T,bc_k::T,num_vp::Real,bc_CLT::Bool; corr_func::T_corr=nothing, bulk_reaction=((x,y)->0,(x,y)->0), reacting_boundaries::AbstractArray{String}=["lower"]) where T<:AbstractFloat where T_corr<:Union{Nothing, Function}
-    return PSP_params(omega_bar, omega_sigma_2,omega_min, c_phi, c_t, bulk_reaction), motion_params(omega_bar,C_0, B_format, u_mean), BC_params(bc_k, C_0, B_format, num_vp, bc_CLT,corr_func=corr_func,reacting_boundaries=reacting_boundaries)
+function PSP_motion_bc_params(omega_bar::T, omega_sigma_2::T,omega_min::T, C_0::T, B_format::String, c_phi::T, c_t::T,u_mean::T,bc_k::T,num_vp::Real; corr_func::T_corr=nothing, bulk_reaction=((x,y)->0,(x,y)->0), reacting_boundaries::AbstractArray{String}=["lower"]) where T<:AbstractFloat where T_corr<:Union{Nothing, Function}
+    return PSP_params(omega_bar, omega_sigma_2,omega_min, c_phi, c_t, bulk_reaction), motion_params(omega_bar,C_0, B_format, u_mean), BC_params(bc_k, C_0, B_format, num_vp, corr_func=corr_func,reacting_boundaries=reacting_boundaries)
 end
 
 function assign_pm!(phi_pm::Matrix{Int}, phi_array_t::Array{T}, particles::Vector{Int}, cell_points::Vector{Int}) where T<:AbstractFloat
