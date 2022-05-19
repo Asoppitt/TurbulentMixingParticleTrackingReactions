@@ -633,7 +633,7 @@ function eval_by_cell!(func!::Function, xp::Vector{TF}, yp::Vector{TF}, space_ce
 end 
 
 #CLt/normal
-function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, turb_k_e::Vector{TF}, bc_params::BCParams{TF,Int, Nothing,true}, t_index::Int) where TF<:AbstractFloat
+function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, turb_k_e::Vector{TF}, bc_params::BCParams{TF,Int, Nothing,false}, t_index::Int) where TF<:AbstractFloat
     n_abs = sum(abs_points)
     abs_k = bc_params.bc_k.*ones(TF, 2,n_abs)
     effective_v_particles =( phip[:,abs_points,t_index].*bc_params.num_vp)
@@ -651,7 +651,7 @@ function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, turb_k_e::Vect
 end
 
 #CLt/normal Precomp
-function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, bc_params::BCParams{TF,Int, Nothing,true}, t_index::Int, Precomp_P::TF) where TF<:AbstractFloat
+function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, bc_params::BCParams{TF,Int, Nothing,false}, t_index::Int, Precomp_P::TF) where TF<:AbstractFloat
     n_abs = sum(abs_points)
     effective_v_particles =( phip[:,abs_points,t_index].*bc_params.num_vp)
     #K for Erban and Chapman approximation 
@@ -701,7 +701,7 @@ end
 # end
 
 #binary Precomp, need to edit this file to enable this, (comment out binomal precomp)
-function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, bc_params::BCParams{TF,Int, Nothing,false}, t_index::Int, Precomp_P::TF) where TF<:AbstractFloat 
+function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, bc_params::BCParams{TF,Int, Nothing,true}, t_index::Int, Precomp_P::TF) where TF<:AbstractFloat 
     #K for Erban and Chapman approximation 
     n_abs = sum(abs_points)
     xi=ones(size(phip)[2])
@@ -735,7 +735,7 @@ end
 ###add in non-liner sorbtion as a correction factor from linear
 
 #CLt/normal Precomp
-function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, bc_params::BCParams{TF,Int,func_T,true}, t_index::Int, Precomp_P::TF) where TF<:AbstractFloat where func_T<:Function
+function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, bc_params::BCParams{TF,Int,func_T,false}, t_index::Int, Precomp_P::TF) where TF<:AbstractFloat where func_T<:Function
     n_abs = sum(abs_points)
     effective_v_particles =( phip[:,abs_points,t_index].*bc_params.num_vp)
     #K for Erban and Chapman approximation 
