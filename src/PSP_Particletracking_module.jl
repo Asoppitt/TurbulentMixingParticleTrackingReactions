@@ -245,6 +245,12 @@ function set_phi_as_ic_up1!(phi_array::Array{TF,3}, t_index::Int) where TF<:Abst
     phi_array[1,:,t_index] .= 1 
     return nothing
 end
+function set_phi_as_ic_empty!(phi_array::Array{TF,3}, t_index::Int) where TF<:AbstractFloat
+    #Initial_condition == "zero"
+    nparticles = size(phi_array)[2]
+    phi_array[:,:,t_index] = abs.(phi_eps*randn(TF,2, nparticles)) #pdf can't find zeros
+    return nothing
+end
 #using subset of particles, mainly for inflow
 function set_phi_as_ic_up1!(phi_array::Array{TF,3}, t_index::Int, subset_indicies) where TF<:AbstractFloat
     #Initial_condition == "Uniform phi1"
@@ -399,7 +405,8 @@ end
 
 #a generic function to contain the switch case between ics
 function set_phi_as_ic!(phi_array::Array{TF,3},IC_type::String,xp::Vector{TF},yp::Vector{TF},space_cells::CellGrid{TF}, t_index::Int) where TF<:AbstractFloat
-    if IC_type == "Uniform phi_1"
+    IC_type=lowercase(IC_type)
+    if IC_type == "uniform phi_1"
         set_phi_as_ic_up1!(phi_array,t_index)
     elseif IC_type == "triple delta"
         set_phi_as_ic_td!(phi_array,t_index)
@@ -411,6 +418,8 @@ function set_phi_as_ic!(phi_array::Array{TF,3},IC_type::String,xp::Vector{TF},yp
         set_phi_as_ic_norm1!(phi_array,t_index)
     elseif IC_type == "centred 2 normal"
         set_phi_as_ic_normboth!(phi_array,t_index)
+    elseif IC_type == "empty"
+        set_phi_as_ic_empty!(phi_array,t_index)
     elseif IC_type in ["double delta difference","2 layers difference","1 layer transport, 1 layer empty","1 layer transport, 1 layer empty x"]
         throw(ArgumentError("Requires addtional parameters"))
     else
@@ -420,18 +429,9 @@ function set_phi_as_ic!(phi_array::Array{TF,3},IC_type::String,xp::Vector{TF},yp
 end
 
 function set_phi_as_ic!(phi_array::Array{TF,3},IC_type::Tuple{String,Vararg},xp::Vector{TF},yp::Vector{TF},space_cells::CellGrid{TF}, t_index::Int) where TF<:AbstractFloat
-    if IC_type == "Uniform phi_1"
-        set_phi_as_ic_up1!(phi_array,t_index)
-    elseif IC_type == "triple delta"
-        set_phi_as_ic_td!(phi_array,t_index)
-    elseif IC_type == "2 layers"
-        set_phi_as_ic_2l!(phi_array,yp,space_cells,t_index)
-    elseif IC_type == "double delta"
-        set_phi_as_ic_dd!(phi_array,t_index)
-    elseif IC_type == "centred normal"
-        set_phi_as_ic_norm1!(phi_array,t_index)
-    elseif IC_type == "centred 2 normal"
-        set_phi_as_ic_normboth!(phi_array,t_index)
+    IC_type=lowercase(IC_type)
+    if length(IC_type)==1
+        set_phi_as_ic!(phi_array,IC_type[1],xp,yp,space_cells,t_index)
     elseif IC_type[1] == "double delta difference"
         set_phi_as_ic_dd_diff!(phi_array,IC_type[2],t_index)
     elseif IC_type[1] == "2 layers difference"
