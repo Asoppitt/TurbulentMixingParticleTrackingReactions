@@ -745,7 +745,7 @@ function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, bc_params::BCP
     corr_arr = [corr_vec[j][i] for i=1:2, j=1:n_abs]
     P .= Precomp_P.*corr_arr
     #by CLT approx dist for number of virtual particles to have reacted
-    xi = randn(TF, 2,n_abs).*sqrt.((P.*(1 .-P)))
+    xi = randn(TF, 2,n_abs).*sqrt.(abs.(P.*(1 .-P)))
     #catching places where all mass has been removed
     xi = [effective_v_particles[i,j]>0 ? xi[i,j]./sqrt(effective_v_particles[i,j]) : 0 for i in 1:2, j in 1:n_abs]
     ratios = max.(min.((1 .-P) + xi,1),0)
