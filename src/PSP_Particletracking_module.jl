@@ -1506,7 +1506,7 @@ function PSP_model_record_reacting_mass!(edge_mean::AbstractArray{T,1}, edge_squ
         dphi .+= reaction
         phip[:,:,1+1] = phip[:,:,1]+dphi
         if !(initial_condition == "triple delta")
-            phip[:,:,t+1] = phip[:,:,t+1].*(phip[:,:,t+1].>0) #forcing positive concentration
+            phip[:,:,1+1] = phip[:,:,1+1].*(phip[:,:,1+1].>0) #forcing positive concentration
         end
         eval_by_cell!(function (i,j,cell_p)
             if i==1
