@@ -1389,7 +1389,7 @@ function PSP_model_record_phi_local_diff!(gphi::AbstractArray{T,3},f_phi::Abstra
     return nothing
 end
 
-function PSP_model_record_reacting_mass!(edge_mean::AbstractArray{T,1}, edge_squared::AbstractArray{T,1}, f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2}, turb_k_e::T, bc_interact::BitArray{3}, dt::T, initial_condition::Union{String,Tuple{String,Vararg}},  p_params::PSPParams{T}, psi_mesh::PsiGrid{T}, space_cells::CellGrid{T}, bc_params::BCParams{T}, verbose::Bool=false) where T<:AbstractFloat
+function PSP_model_record_reacting_mass!(edge_mean::AbstractArray{T,1}, edge_squared::AbstractArray{T,1}, edge_squared_v::AbstractArray{T,1}, f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2}, turb_k_e::T, bc_interact::BitArray{3}, dt::T, initial_condition::Union{String,Tuple{String,Vararg}},  p_params::PSPParams{T}, psi_mesh::PsiGrid{T}, space_cells::CellGrid{T}, bc_params::BCParams{T}, verbose::Bool=false) where T<:AbstractFloat
     omega_mean=p_params.omega_bar
     omega_sigma_2 = p_params.omega_sigma_2
     T_omega = p_params.T_omega
@@ -1513,6 +1513,10 @@ function PSP_model_record_reacting_mass!(edge_mean::AbstractArray{T,1}, edge_squ
                 edge_mean[t] += sum(phip[1,cell_p[bc_interact[cell_p,t,2]],1+1]) / (length(cell_p)*space_cells.x_res)
                 # println(length(cell_p),' ', edge_mean[t],' ',sum(phip[1,cell_p[bc_interact[cell_p,t,2]],t+1]) / (length(cell_p)*space_cells.x_res))
                 edge_squared[t] += sum(phip[1,cell_p[bc_interact[cell_p,t,2]],1+1].^2) / (length(cell_p)*space_cells.x_res)
+                if t>=2
+                    v_t=y_pos[cell_p[bc_interact[cell_p,t,2]],t]-y_pos[cell_p[bc_interact[cell_p,t,2]],t-1]
+                    edge_squared_v[t-1] += sum(v_t.*phip[1,cell_p[bc_interact[cell_p,t,2]],1+1].^2) / (length(cell_p)*space_cells.x_res)
+                end
             end
             return nothing
         end,  x_pos[:,t], y_pos[:,t], space_cells)
