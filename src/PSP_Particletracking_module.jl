@@ -429,7 +429,7 @@ function set_phi_as_ic!(phi_array::Array{TF,3},IC_type::String,xp::Vector{TF},yp
 end
 
 function set_phi_as_ic!(phi_array::Array{TF,3},IC_type::Tuple{String,Vararg},xp::Vector{TF},yp::Vector{TF},space_cells::CellGrid{TF}, t_index::Int) where TF<:AbstractFloat
-    IC_type=lowercase(IC_type)
+    IC_type[1]=lowercase(IC_type[1])
     if length(IC_type)==1
         set_phi_as_ic!(phi_array,IC_type[1],xp,yp,space_cells,t_index)
     elseif IC_type[1] == "double delta difference"
@@ -1515,7 +1515,8 @@ function PSP_model_record_reacting_mass!(edge_mean::AbstractArray{T,1}, edge_squ
                 edge_squared[t] += sum(phip[1,cell_p[bc_interact[cell_p,t,2]],1+1].^2) / (length(cell_p)*space_cells.x_res)
                 if t>=2
                     v_t=y_pos[cell_p[bc_interact[cell_p,t,2]],t]-y_pos[cell_p[bc_interact[cell_p,t,2]],t-1]
-                    edge_squared_v[t-1] += sum(v_t.*phip[1,cell_p[bc_interact[cell_p,t,2]],1+1].^2) / (length(cell_p)*space_cells.x_res)
+                    println(maximum(v_t),' ',minimum(v_t))
+                    edge_squared_v[t-1] += sum(v_t.*phip[1,cell_p[bc_interact[cell_p,t,2]],1].^2) / (length(cell_p)*space_cells.x_res)
                 end
             end
             return nothing
