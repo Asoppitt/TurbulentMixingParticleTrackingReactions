@@ -429,7 +429,7 @@ function set_phi_as_ic!(phi_array::Array{TF,3},IC_type::String,xp::Vector{TF},yp
 end
 
 function set_phi_as_ic!(phi_array::Array{TF,3},IC_type::Tuple{String,Vararg},xp::Vector{TF},yp::Vector{TF},space_cells::CellGrid{TF}, t_index::Int) where TF<:AbstractFloat
-    IC_type[1]=lowercase(IC_type[1])
+    IC_type=(lowercase(IC_type[1]),IC_type[2])
     if length(IC_type)==1
         set_phi_as_ic!(phi_array,IC_type[1],xp,yp,space_cells,t_index)
     elseif IC_type[1] == "double delta difference"
