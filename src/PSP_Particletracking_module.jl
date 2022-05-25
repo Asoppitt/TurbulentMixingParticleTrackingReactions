@@ -330,6 +330,22 @@ function set_phi_as_ic_2l_one_empty_x!(phi_array::Array{TF,3},empty_layer::Integ
     end
     return nothing
 end
+
+function set_phi_as_ic_vert_strip!(phi_array::Array{TF,3},left_edge::TF,right_edge::TF,xp::Vector{TF},space_cells::CellGrid{TF}, t_index::Int) where TF<:AbstractFloat
+    #Initial_condition == "1 layer scalar, 1 layer empty"
+    nparticles = size(phi_array)[2]
+    local noise_term = randn(TF, nparticles)
+    # local uniform_noise = rand(nparticles).-0.5
+    in_strip=(xp.>left_edge) .& (xp.<right_edge)
+
+    phi_array[2,in_strip,t_index] = abs.(phi_eps*noise_term[in_strip] )
+    phi_array[1,in_strip,t_index] .= 1
+
+    phi_array[1,.!in_strip,t_index] = abs.(phi_eps*noise_term[.!in_strip] )
+    phi_array[2,.!in_strip,t_index] .= abs.(phi_eps*noise_term[.!in_strip] )
+    return nothing
+end
+
 function set_phi_as_ic_dd!(phi_array::Array{TF,3},t_index::Int) where TF<:AbstractFloat
     #Initial_condition == "double delta"
     nparticles = size(phi_array)[2]
@@ -429,17 +445,19 @@ function set_phi_as_ic!(phi_array::Array{TF,3},IC_type::String,xp::Vector{TF},yp
 end
 
 function set_phi_as_ic!(phi_array::Array{TF,3},IC_type::Tuple{String,Vararg},xp::Vector{TF},yp::Vector{TF},space_cells::CellGrid{TF}, t_index::Int) where TF<:AbstractFloat
-    IC_type=(lowercase(IC_type[1]),IC_type[2])
+    IC_type_str=lowercase(IC_type[1])
     if length(IC_type)==1
         set_phi_as_ic!(phi_array,IC_type[1],xp,yp,space_cells,t_index)
-    elseif IC_type[1] == "double delta difference"
+    elseif IC_type_str == "double delta difference"
         set_phi_as_ic_dd_diff!(phi_array,IC_type[2],t_index)
-    elseif IC_type[1] == "2 layers difference"
+    elseif IC_type_str == "2 layers difference"
         set_phi_as_ic_2l_diff!(phi_array,IC_type[2],yp,space_cells,t_index)
-    elseif IC_type[1] == "1 layer transport, 1 layer empty"
+    elseif IC_type_str == "1 layer transport, 1 layer empty"
         set_phi_as_ic_2l_one_empty!(phi_array,IC_type[2],yp,space_cells,t_index)
-    elseif IC_type[1] == "1 layer transport, 1 layer empty x"
+    elseif IC_type_str == "1 layer transport, 1 layer empty x"
         set_phi_as_ic_2l_one_empty_x!(phi_array,IC_type[2],xp,space_cells,t_index)
+    elseif IC_type_str == "vertical strip"
+        set_phi_as_ic_vert_strip!(phi_array,IC_type[2],IC_type[3],xp,space_cells,t_index)
     else
         throw(ArgumentError("Not a valid intitial condition"))
     end
