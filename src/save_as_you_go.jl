@@ -67,9 +67,10 @@ function particle_motion_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractAr
 end
 
 function PSP_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractArray{T,1},phip::AbstractArray{T,3},
-        omegap::AbstractArray{T,1},t_decorr_m::AbstractArray{T,1},t_decorr_p::AbstractArray{T,1}, 
-        phi_pm::AbstractArray{index_type, 2}, bc_interact::BitArray{2}, dt::T, p_params::PSPParams{T},
-        space_cells::CellGrid{T}, bc_params::BCParams{T},np::Integer,precomp_P::T) where T<:AbstractFloat where index_type<:Integer
+        celli::AbstractArray{Array{Int,1},2}, omegap::AbstractArray{T,1}, t_decorr_m::AbstractArray{T,1},
+        t_decorr_p::AbstractArray{T,1}, phi_pm::AbstractArray{index_type, 2}, bc_interact::BitArray{2}, 
+        dt::T, p_params::PSPParams{T}, space_cells::CellGrid{T}, bc_params::BCParams{T}, np::Integer,
+        precomp_P::T) where T<:AbstractFloat where index_type<:Integer 
     
     omega_mean=p_params.omega_bar
     omega_sigma_2 = p_params.omega_sigma_2
@@ -98,9 +99,11 @@ function PSP_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractArray{T,1},phi
     t_p0 = xor.(t_p0,t_pm0)
     t_m0 = xor.(t_m0,t_pm0)
 
-    #split into cells, compute centres/targets, run ODE step
+    #update cell particle lists
     eval_by_cell!(function (i,j,cell_particles)
         (length(cell_particles)==0) && throw(BoundsError(cell_particles))
+        #adjust mass to match new cell particle count. ref Elisa Baioni 2021
+        celli[i,j]=cell_particles
         #reassigning particles that completed decorrelation time
         t_p0_cell = cell_particles[t_p0[cell_particles]]
         t_m0_cell = cell_particles[t_m0[cell_particles]]
@@ -112,6 +115,7 @@ function PSP_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractArray{T,1},phi
         pm_check_and_recal_for_cell_change!(phi_pm, phip, cell_particles)
         return nothing
     end, x_pos, y_pos, space_cells)
+
     #reset decorrelation time for particles it had run out on
     t_decorr_p[t_p0.&t_pm0] = 1 ./(c_t.*omegap[phi_pm[1,t_p0.&t_pm0]])
     t_decorr_m[t_m0.&t_pm0] = 1 ./(c_t.*omegap[phi_pm[2,t_m0.&t_pm0]])
@@ -136,7 +140,8 @@ function PSP_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractArray{T,1},phi
     #performing adjustment to mean 0
     corr_factor = zeros(T, 2,np)
     
-    eval_by_cell!(function (i,j,cell_particles)
+    # eval_by_cell!(function (i,j,cell_particles) #if recomputaion of cell is needed
+    for cell_particles in celli
         for phi_i=1:2
             phi_mean = mean(dphi[phi_i,cell_particles])
             if phi_mean != 0 #isn't true for empty cells
@@ -151,8 +156,9 @@ function PSP_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractArray{T,1},phi
                 end
             end
         end
-        return nothing
-    end, x_pos, y_pos, space_cells)
+    end
+        # return nothing
+    # end, x_pos, y_pos, space_cells)
 
     dphi = corr_factor.*dphi
     dphi = T_mat*dphi #return to old coords
@@ -169,7 +175,7 @@ function PSP_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractArray{T,1},phi
     return nothing
 end
 
-function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Integer, initial_condition::Union{String,Tuple{String,Vararg}}, m_params::MotionParams{T}, p_params::PSPParams{T}, psi_mesh::PsiGrid{T}, space_cells::CellGrid{T}, bc_params::BCParams{T}, verbose::Bool=false, chunk_length::Integer=50) where T<:AbstractFloat
+function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Integer, initial_condition::Union{String,Tuple{String,Vararg}}, m_params::MotionParams{T}, p_params::PSPParams{T}, psi_mesh::PsiGrid{T}, space_cells::CellGrid{T}, bc_params::BCParams{T}, verbose::Bool=false, chunk_length::Integer=50; record_moments=false) where T<:AbstractFloat
     omega_mean=p_params.omega_bar
     omega_sigma_2 = p_params.omega_sigma_2
     T_omega = p_params.T_omega
@@ -179,7 +185,7 @@ function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Inte
     n_chunks=floor(Int, nt/chunk_length)
     precomp_P = min.(bc_params.bc_k.*sqrt.(bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
 
-    ux = randn(T, np).*sqrt.(T(2/3) .*turb_k_e)
+    ux = randn(T, np).*sqrt.(T(2/3) .*turb_k_e).+u_mean
     uy = randn(T, np).*sqrt.(T(2/3) .*turb_k_e)
     x_pos = zeros(T, np)
     y_pos = zeros(T, np)
@@ -197,36 +203,65 @@ function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Inte
     omega0_dist = Gamma{T}(T((omega_mean-p_params.omega_min)^2/(omega_sigma_2)),T((omega_sigma_2)/(omega_mean-p_params.omega_min))) #this should now match long term distribution of omega
     omegap = T.(rand(omega0_dist, np).+p_params.omega_min)
     
-    eval_by_cell!((i,j,cell_particles)-> (assign_pm!(phi_pm, phip, cell_particles, cell_particles)
-    ;assign_f_phi_cell!(f_phi,phip[:,cell_particles],psi_mesh,i,j,1);return nothing) , x_pos, y_pos, space_cells)
+    celli= Array{Array{Int,1},2}(undef,y_res,x_res)
+    #assign boundary particles and count cell_particles
+    eval_by_cell!((i,j,cell_particles)-> (assign_pm!(phi_pm, phip, cell_particles, cell_particles);
+        celli[i,j] = cell_particles;
+    return nothing) , x_pos, y_pos, space_cells)
 
     #time stamp until new p/m bound found, needed to ensure particles are
     #decorreltaed
     t_decorr_p = T(1) ./(c_t.*omegap[phi_pm[1,:]]).*rand(T,np)
     t_decorr_m = T(1) ./(c_t.*omegap[phi_pm[2,:]]).*rand(T,np)
 
-    for chunk=0:n_chunks
+    if record_moments
+        means=zeros(float_type,2,chunk_length)
+        mom_2=zeros(float_type,2,chunk_length)
+    end
+
+    for chunk=0:n_chunks-1
         for t in (chunk*chunk_length+1):((chunk+1)*chunk_length)
             bc_interact=particle_motion_model_step!(x_pos,y_pos, ux,uy, turb_k_e, m_params, dt, space_cells, np)
-            PSP_model_step!(x_pos,y_pos,phip,omegap, t_decorr_m, t_decorr_p, phi_pm, bc_interact, dt, p_params,space_cells, bc_params,np,precomp_P)
-            assign_f_phi!(f_phi,phip[:,:], x_pos, y_pos, psi_mesh, space_cells,t-chunk*chunk_length)
+            PSP_model_step!(x_pos,y_pos,phip,celli,omegap, t_decorr_m, t_decorr_p, phi_pm, bc_interact, dt, p_params,space_cells, bc_params,np,precomp_P)
+            for (ind, cell_parts) in pairs(celli)#pariticle-cell pairs are already defined, so use them for f_phi
+                assign_f_phi_cell!(f_phi,phip[:,cell_parts], psi_mesh, ind[1],ind[2],t-chunk*chunk_length)
+            end
+            record_moments && (means[:,t-chunk*chunk_length] = mean(phip, dims=2)[:,1])
+            record_moments && (mom_2[:,t-chunk*chunk_length] = mean(phip.^2, dims=2)[:,1])
             verbose && print(t,' ')
         end
         write(foldername*'/'*string(chunk*chunk_length+1)*'_'*string((chunk+1)*chunk_length)*"data",f_phi)
         write(foldername*'/'*string(chunk*chunk_length+1)*'_'*string((chunk+1)*chunk_length)*"array_shape",[i for i in size(f_phi)])
-        write(foldername*'/'*"total_shape", [chunk,chunk_length,((chunk+1)*chunk_length),false] )
+        if record_moments
+            write(foldername*'/'*string(chunk*chunk_length+1)*'_'*string((chunk+1)*chunk_length)*"mean",means)
+            write(foldername*'/'*string(chunk*chunk_length+1)*'_'*string((chunk+1)*chunk_length)*"2nd_moment",mom_2)
+        end
+        write(foldername*'/'*"total_shape", [chunk+1,chunk_length,((chunk+1)*chunk_length),false,record_moments] )
         verbose && println('\n',"saved steps: "*string(chunk*chunk_length+1)*" to "*string((chunk+1)*chunk_length))
     end
-    if (n_chunks+1)*chunk_length < nt
-        for t in ((n_chunks+1)*chunk_length+1):nt
+    if (n_chunks)*chunk_length < nt
+        f_phi=zeros(T,psi_mesh.psi_partions_num, psi_mesh.psi_partions_num, space_cells.y_res, space_cells.x_res, nt-(n_chunks)*chunk_length )
+        if record_moments
+            means=zeros(float_type,2,nt-(n_chunks)*chunk_length)
+            mom_2=zeros(float_type,2,nt-(n_chunks)*chunk_length)
+        end
+        for t in ((n_chunks)*chunk_length+1):nt
             bc_interact=particle_motion_model_step!(x_pos,y_pos, ux,uy, turb_k_e, m_params, dt, space_cells, np)
-            PSP_model_step!(x_pos,y_pos,phip,omegap,t_decorr_p, t_decorr_m, phi_pm, bc_interact, dt, p_params,space_cells, bc_params,np,precomp_P)
-            assign_f_phi!(f_phi,phip[:,:], x_pos, y_pos, psi_mesh, space_cells,t-(n_chunks+1)*chunk_length)
+            PSP_model_step!(x_pos,y_pos,phip,celli,omegap,t_decorr_p, t_decorr_m, phi_pm, bc_interact, dt, p_params,space_cells, bc_params,np,precomp_P)
+            for (ind, cell_parts) in pairs(celli)#pariticle-cell pairs are already defined, so use them for f_phi
+                assign_f_phi_cell!(f_phi,phip[:,cell_parts], psi_mesh, ind[1],ind[2],t-(n_chunks)*chunk_length)
+            end
+            record_moments && (means[:,t-(n_chunks)*chunk_length] = mean(phip, dims=2)[:,1])
+            record_moments && (mom_2[:,t-(n_chunks)*chunk_length] = mean(phip.^2, dims=2)[:,1])
             verbose && print(t,' ')
         end
-        write(foldername*'/'*string(chunk_length*(n_chunks+1)+1)*'_'*string(nt)*"data",f_phi)
-        write(foldername*'/'*string(chunk_length*(n_chunks+1)+1)*'_'*string(nt)*"array_shape",[i for i in size(f_phi)])
-        write(foldername*'/'*"total_shape", [(n_chunks+1),chunk_length,nt,true] )
+        write(foldername*'/'*string(chunk_length*(n_chunks)+1)*'_'*string(nt)*"data",f_phi)
+        write(foldername*'/'*string(chunk_length*(n_chunks)+1)*'_'*string(nt)*"array_shape",[i for i in size(f_phi)])
+        if record_moments
+            write(foldername*'/'*string(chunk_length*(n_chunks)+1)*'_'*string(nt)*"mean",means)
+            write(foldername*'/'*string(chunk_length*(n_chunks)+1)*'_'*string(nt)*"2nd_moment",mom_2)
+        end
+        write(foldername*'/'*"total_shape", [(n_chunks+1),chunk_length,nt,true, record_moments] )
         verbose && println('\n',"saved steps: "*string(chunk_length*(n_chunks+1)+1)*" to "*string(nt))
     end
     verbose && println("end")
