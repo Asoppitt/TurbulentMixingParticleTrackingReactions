@@ -1,5 +1,4 @@
 include("PSP_Particletracking_module.jl")
-
 # module ContinuousSaving
 
 function particle_motion_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractArray{T,1}, ux::AbstractArray{T,1},uy::AbstractArray{T,1}, turb_k_e::T, m_params::MotionParams{T}, dt::T, space_cells::CellGrid{T},np::Integer) where T<:AbstractFloat
@@ -11,8 +10,8 @@ function particle_motion_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractAr
     u_mean=m_params.u_mean
     bc_interact = falses(np, 4)#index is for: upper, lower, right, left
     #intitial vaules of velocity, maintaining consitancy with energy
-    ux_flux=ux.-u_mean
-    ux[:]= ux_flux+(-T(0.5)*B*omega_bar*ux_flux)*dt.+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
+    ux_f=ux.-u_mean #find fluctuating velocity
+    ux[:]= ux_f+(-T(0.5)*B*omega_bar*ux_f)*dt.+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
     uy[:]= uy+(-T(0.5)*B*omega_bar*uy)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
     ux[:].+= u_mean
     x_pos[:]= x_pos + ux*dt # random walk in x-direction
@@ -251,6 +250,76 @@ function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Inte
             for (ind, cell_parts) in pairs(celli)#pariticle-cell pairs are already defined, so use them for f_phi
                 assign_f_phi_cell!(f_phi,phip[:,cell_parts], psi_mesh, ind[1],ind[2],t-(n_chunks)*chunk_length)
             end
+            record_moments && (means[:,t-(n_chunks)*chunk_length] = mean(phip, dims=2)[:,1])
+            record_moments && (mom_2[:,t-(n_chunks)*chunk_length] = mean(phip.^2, dims=2)[:,1])
+            verbose && print(t,' ')
+        end
+        write(foldername*'/'*string(chunk_length*(n_chunks)+1)*'_'*string(nt)*"data",f_phi)
+        write(foldername*'/'*string(chunk_length*(n_chunks)+1)*'_'*string(nt)*"array_shape",[i for i in size(f_phi)])
+        if record_moments
+            write(foldername*'/'*string(chunk_length*(n_chunks)+1)*'_'*string(nt)*"mean",means)
+            write(foldername*'/'*string(chunk_length*(n_chunks)+1)*'_'*string(nt)*"2nd_moment",mom_2)
+        end
+        write(foldername*'/'*"total_shape", [(n_chunks+1),chunk_length,nt,true, record_moments] )
+        verbose && println('\n',"saved steps: "*string(chunk_length*(n_chunks+1)+1)*" to "*string(nt))
+    end
+    verbose && println("end")
+    return nothing
+end
+
+function no_psp_motion_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Integer, initial_condition::Union{String,Tuple{String,Vararg}}, m_params::MotionParams{T}, p_params::PSPParams{T}, psi_mesh::PsiGrid{T}, space_cells::CellGrid{T}, bc_params::BCParams{T}, verbose::Bool=false, chunk_length::Integer=50; record_moments=false) where T<:AbstractFloat
+    nt-=1
+    n_chunks=floor(Int, nt/chunk_length)
+ 
+    ux = randn(T, np).*sqrt.(T(2/3) .*turb_k_e).+u_mean
+    uy = randn(T, np).*sqrt.(T(2/3) .*turb_k_e)
+    x_pos = zeros(T, np)
+    y_pos = zeros(T, np)
+    x_pos = length_domain.*rand(float_type, np)
+    y_pos = height_domain.*rand(float_type, np)
+
+    phip = zeros(T, (2, np,1)) #scalar concentration at these points
+
+    f_phi=zeros(T,psi_mesh.psi_partions_num, psi_mesh.psi_partions_num, space_cells.y_res, space_cells.x_res, chunk_length)
+
+    set_phi_as_ic!(phip,initial_condition,x_pos,y_pos,space_cells,1)
+    assign_f_phi!(f_phi,phip, x_pos, y_pos, psi_mesh, space_cells,1)
+
+    if record_moments
+        means=zeros(float_type,2,chunk_length)
+        mom_2=zeros(float_type,2,chunk_length)
+    end
+
+    for chunk=0:n_chunks-1
+        for t in (chunk*chunk_length+1):((chunk+1)*chunk_length)
+            bc_interact=particle_motion_model_step!(x_pos,y_pos, ux,uy, turb_k_e, m_params, dt, space_cells, np)
+            eval_by_cell!((i,j,cell_particles)-> (
+                assign_f_phi_cell!(f_phi,phip[:,cell_particles], psi_mesh, 1,j,t-chunk*chunk_length);
+            return nothing) , x_pos, y_pos, space_cells)
+            record_moments && (means[:,t-chunk*chunk_length] = mean(phip, dims=2)[:,1])
+            record_moments && (mom_2[:,t-chunk*chunk_length] = mean(phip.^2, dims=2)[:,1])
+            verbose && print(t,' ')
+        end
+        write(foldername*'/'*string(chunk*chunk_length+1)*'_'*string((chunk+1)*chunk_length)*"data",f_phi)
+        write(foldername*'/'*string(chunk*chunk_length+1)*'_'*string((chunk+1)*chunk_length)*"array_shape",[i for i in size(f_phi)])
+        if record_moments
+            write(foldername*'/'*string(chunk*chunk_length+1)*'_'*string((chunk+1)*chunk_length)*"mean",means)
+            write(foldername*'/'*string(chunk*chunk_length+1)*'_'*string((chunk+1)*chunk_length)*"2nd_moment",mom_2)
+        end
+        write(foldername*'/'*"total_shape", [chunk+1,chunk_length,((chunk+1)*chunk_length),false,record_moments] )
+        verbose && println('\n',"saved steps: "*string(chunk*chunk_length+1)*" to "*string((chunk+1)*chunk_length))
+    end
+    if (n_chunks)*chunk_length < nt
+        f_phi=zeros(T,psi_mesh.psi_partions_num, psi_mesh.psi_partions_num, space_cells.y_res, space_cells.x_res, nt-(n_chunks)*chunk_length )
+        if record_moments
+            means=zeros(float_type,2,nt-(n_chunks)*chunk_length)
+            mom_2=zeros(float_type,2,nt-(n_chunks)*chunk_length)
+        end
+        for t in ((n_chunks)*chunk_length+1):nt
+            bc_interact=particle_motion_model_step!(x_pos,y_pos, ux,uy, turb_k_e, m_params, dt, space_cells, np)
+            eval_by_cell!((i,j,cell_particles)-> (
+                assign_f_phi_cell!(f_phi,phip[:,cell_particles], psi_mesh, 1,j,t-(n_chunks)*chunk_length);
+            return nothing) , x_pos, y_pos, space_cells)
             record_moments && (means[:,t-(n_chunks)*chunk_length] = mean(phip, dims=2)[:,1])
             record_moments && (mom_2[:,t-(n_chunks)*chunk_length] = mean(phip.^2, dims=2)[:,1])
             verbose && print(t,' ')

@@ -9,7 +9,7 @@ export cell_grid,BC_params,psi_grid,motion_params,PSP_motion_bc_params,
 particle_motion_model, PSP_model!, particle_motion_model_ref_start, PSP_model_record_phi_local_diff!,
 PSP_model_record_reacting_mass!
 
-phi_eps=1e-8
+phi_eps=1e-12
 struct CellGrid{T<:AbstractFloat}
     x_res ::Int
     y_res ::Int
@@ -402,6 +402,15 @@ function set_phi_as_ic_norm1!(phi_array::Array{TF,3}, t_index::Int) where TF<:Ab
     return nothing
 end
 
+function set_phi_as_ic_norm1x!(phi_array::Array{TF,3},lengthscale::TF,xp::Vector{TF},space_cells::CellGrid{TF}, t_index::Int) where TF<:AbstractFloat
+    #Initial_condition == "Uniform phi1"
+    nparticles = size(phi_array)[2]
+    gaussian_space(x::TF) = exp(-TF(0.5)*((x-TF(0.5)*space_cells.length_domain)/lengthscale)^TF(2))
+    phi_array[1,:,t_index] = gaussian_space.(xp)
+    phi_array[2,:,t_index] = abs.(phi_eps*randn(TF, nparticles))
+    return nothing
+end
+
 function set_phi_as_ic_normboth!(phi_array::Array{TF,3}, t_index::Int) where TF<:AbstractFloat
     #Initial_condition == "Uniform phi1"
     nparticles = size(phi_array)[2]
@@ -489,6 +498,8 @@ function set_phi_as_ic!(phi_array::Array{TF,3},IC_type::Tuple{String,Vararg},xp:
         set_phi_as_ic_vert_strip!(phi_array,IC_type[2:end]...,xp,space_cells,t_index)
     elseif IC_type_str == "vertical strip difference"
         set_phi_as_ic_vert_strip_diff!(phi_array,IC_type[2:end]...,xp,space_cells,t_index)
+    elseif IC_type_str == "x centred normal"
+        set_phi_as_ic_norm1x!(phi_array,IC_type[2:end]...,xp,space_cells,t_index)
     else
         throw(ArgumentError("Not a valid intitial condition"))
     end
