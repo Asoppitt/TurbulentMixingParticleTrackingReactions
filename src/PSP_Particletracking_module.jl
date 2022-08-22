@@ -103,8 +103,8 @@ function BC_params(bc_k::T, C_0::T, B_format::String, num_vp::Tvp; corr_func::T_
     end
 end
 
-function PSP_motion_bc_params(omega_bar::T, omega_sigma_2::T,omega_min::T, C_0::T, B_format::String, c_phi::T, c_t::T,u_mean::T,bc_k::T,num_vp::Real,bc_CLT::Bool; corr_func::T_corr=nothing, bulk_reaction=((x,y)->0,(x,y)->0), reacting_boundaries::AbstractArray{String}=["lower"]) where T<:AbstractFloat where T_corr<:Union{Nothing, Function}
-    return PSP_params(omega_bar, omega_sigma_2,omega_min, c_phi, c_t, bulk_reaction), motion_params(omega_bar,C_0, B_format, u_mean), BC_params(bc_k, C_0, B_format, num_vp, bc_CLT,corr_func=corr_func,reacting_boundaries=reacting_boundaries)
+function PSP_motion_bc_params(omega_bar::T, omega_sigma_2::T,omega_min::T, C_0::T, B_format::String, c_phi::T, c_t::T,u_mean::T,bc_k::T,num_vp::Real; corr_func::T_corr=nothing, bulk_reaction=((x,y)->0,(x,y)->0), reacting_boundaries::AbstractArray{String}=["lower"]) where T<:AbstractFloat where T_corr<:Union{Nothing, Function}
+    return PSP_params(omega_bar, omega_sigma_2,omega_min, c_phi, c_t, bulk_reaction), motion_params(omega_bar,C_0, B_format, u_mean), BC_params(bc_k, C_0, B_format, num_vp, corr_func=corr_func,reacting_boundaries=reacting_boundaries)
 end
 
 function assign_pm!(phi_pm::Matrix{Int}, phi_array_t::Array{T}, particles::Vector{Int}, cell_points::Vector{Int}) where T<:AbstractFloat
@@ -245,6 +245,12 @@ function set_phi_as_ic_up1!(phi_array::Array{TF,3}, t_index::Int) where TF<:Abst
     phi_array[1,:,t_index] .= 1 
     return nothing
 end
+function set_phi_as_ic_empty!(phi_array::Array{TF,3}, t_index::Int) where TF<:AbstractFloat
+    #Initial_condition == "zero"
+    nparticles = size(phi_array)[2]
+    phi_array[:,:,t_index] = abs.(phi_eps*randn(TF,2, nparticles)) #pdf can't find zeros
+    return nothing
+end
 #using subset of particles, mainly for inflow
 function set_phi_as_ic_up1!(phi_array::Array{TF,3}, t_index::Int, subset_indicies) where TF<:AbstractFloat
     #Initial_condition == "Uniform phi1"
@@ -324,6 +330,22 @@ function set_phi_as_ic_2l_one_empty_x!(phi_array::Array{TF,3},empty_layer::Integ
     end
     return nothing
 end
+
+function set_phi_as_ic_vert_strip!(phi_array::Array{TF,3},left_edge::TF,right_edge::TF,xp::Vector{TF},space_cells::CellGrid{TF}, t_index::Int) where TF<:AbstractFloat
+    #Initial_condition == "1 layer scalar, 1 layer empty"
+    nparticles = size(phi_array)[2]
+    local noise_term = randn(TF, nparticles)
+    # local uniform_noise = rand(nparticles).-0.5
+    in_strip=(xp.>left_edge) .& (xp.<right_edge)
+
+    phi_array[2,in_strip,t_index] = abs.(phi_eps*noise_term[in_strip] )
+    phi_array[1,in_strip,t_index] .= 1
+
+    phi_array[1,.!in_strip,t_index] = abs.(phi_eps*noise_term[.!in_strip] )
+    phi_array[2,.!in_strip,t_index] .= abs.(phi_eps*noise_term[.!in_strip] )
+    return nothing
+end
+
 function set_phi_as_ic_dd!(phi_array::Array{TF,3},t_index::Int) where TF<:AbstractFloat
     #Initial_condition == "double delta"
     nparticles = size(phi_array)[2]
@@ -399,7 +421,8 @@ end
 
 #a generic function to contain the switch case between ics
 function set_phi_as_ic!(phi_array::Array{TF,3},IC_type::String,xp::Vector{TF},yp::Vector{TF},space_cells::CellGrid{TF}, t_index::Int) where TF<:AbstractFloat
-    if IC_type == "Uniform phi_1"
+    IC_type=lowercase(IC_type)
+    if IC_type == "uniform phi_1"
         set_phi_as_ic_up1!(phi_array,t_index)
     elseif IC_type == "triple delta"
         set_phi_as_ic_td!(phi_array,t_index)
@@ -411,6 +434,8 @@ function set_phi_as_ic!(phi_array::Array{TF,3},IC_type::String,xp::Vector{TF},yp
         set_phi_as_ic_norm1!(phi_array,t_index)
     elseif IC_type == "centred 2 normal"
         set_phi_as_ic_normboth!(phi_array,t_index)
+    elseif IC_type == "empty"
+        set_phi_as_ic_empty!(phi_array,t_index)
     elseif IC_type in ["double delta difference","2 layers difference","1 layer transport, 1 layer empty","1 layer transport, 1 layer empty x"]
         throw(ArgumentError("Requires addtional parameters"))
     else
@@ -420,26 +445,19 @@ function set_phi_as_ic!(phi_array::Array{TF,3},IC_type::String,xp::Vector{TF},yp
 end
 
 function set_phi_as_ic!(phi_array::Array{TF,3},IC_type::Tuple{String,Vararg},xp::Vector{TF},yp::Vector{TF},space_cells::CellGrid{TF}, t_index::Int) where TF<:AbstractFloat
-    if IC_type == "Uniform phi_1"
-        set_phi_as_ic_up1!(phi_array,t_index)
-    elseif IC_type == "triple delta"
-        set_phi_as_ic_td!(phi_array,t_index)
-    elseif IC_type == "2 layers"
-        set_phi_as_ic_2l!(phi_array,yp,space_cells,t_index)
-    elseif IC_type == "double delta"
-        set_phi_as_ic_dd!(phi_array,t_index)
-    elseif IC_type == "centred normal"
-        set_phi_as_ic_norm1!(phi_array,t_index)
-    elseif IC_type == "centred 2 normal"
-        set_phi_as_ic_normboth!(phi_array,t_index)
-    elseif IC_type[1] == "double delta difference"
+    IC_type_str=lowercase(IC_type[1])
+    if length(IC_type)==1
+        set_phi_as_ic!(phi_array,IC_type[1],xp,yp,space_cells,t_index)
+    elseif IC_type_str == "double delta difference"
         set_phi_as_ic_dd_diff!(phi_array,IC_type[2],t_index)
-    elseif IC_type[1] == "2 layers difference"
+    elseif IC_type_str == "2 layers difference"
         set_phi_as_ic_2l_diff!(phi_array,IC_type[2],yp,space_cells,t_index)
-    elseif IC_type[1] == "1 layer transport, 1 layer empty"
+    elseif IC_type_str == "1 layer transport, 1 layer empty"
         set_phi_as_ic_2l_one_empty!(phi_array,IC_type[2],yp,space_cells,t_index)
-    elseif IC_type[1] == "1 layer transport, 1 layer empty x"
+    elseif IC_type_str == "1 layer transport, 1 layer empty x"
         set_phi_as_ic_2l_one_empty_x!(phi_array,IC_type[2],xp,space_cells,t_index)
+    elseif IC_type_str == "vertical strip"
+        set_phi_as_ic_vert_strip!(phi_array,IC_type[2],IC_type[3],xp,space_cells,t_index)
     else
         throw(ArgumentError("Not a valid intitial condition"))
     end
@@ -633,7 +651,7 @@ function eval_by_cell!(func!::Function, xp::Vector{TF}, yp::Vector{TF}, space_ce
 end 
 
 #CLt/normal
-function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, turb_k_e::Vector{TF}, bc_params::BCParams{TF,Int, Nothing,true}, t_index::Int) where TF<:AbstractFloat
+function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, turb_k_e::Vector{TF}, bc_params::BCParams{TF,Int, Nothing,false}, t_index::Int) where TF<:AbstractFloat
     n_abs = sum(abs_points)
     abs_k = bc_params.bc_k.*ones(TF, 2,n_abs)
     effective_v_particles =( phip[:,abs_points,t_index].*bc_params.num_vp)
@@ -651,7 +669,7 @@ function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, turb_k_e::Vect
 end
 
 #CLt/normal Precomp
-function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, bc_params::BCParams{TF,Int, Nothing,true}, t_index::Int, Precomp_P::TF) where TF<:AbstractFloat
+function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, bc_params::BCParams{TF,Int, Nothing,false}, t_index::Int, Precomp_P::TF) where TF<:AbstractFloat
     n_abs = sum(abs_points)
     effective_v_particles =( phip[:,abs_points,t_index].*bc_params.num_vp)
     #K for Erban and Chapman approximation 
@@ -701,7 +719,7 @@ end
 # end
 
 #binary Precomp, need to edit this file to enable this, (comment out binomal precomp)
-function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, bc_params::BCParams{TF,Int, Nothing,false}, t_index::Int, Precomp_P::TF) where TF<:AbstractFloat 
+function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, bc_params::BCParams{TF,Int, Nothing,true}, t_index::Int, Precomp_P::TF) where TF<:AbstractFloat 
     #K for Erban and Chapman approximation 
     n_abs = sum(abs_points)
     xi=ones(size(phip)[2])
@@ -735,7 +753,7 @@ end
 ###add in non-liner sorbtion as a correction factor from linear
 
 #CLt/normal Precomp
-function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, bc_params::BCParams{TF,Int,func_T,true}, t_index::Int, Precomp_P::TF) where TF<:AbstractFloat where func_T<:Function
+function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, bc_params::BCParams{TF,Int,func_T,false}, t_index::Int, Precomp_P::TF) where TF<:AbstractFloat where func_T<:Function
     n_abs = sum(abs_points)
     effective_v_particles =( phip[:,abs_points,t_index].*bc_params.num_vp)
     #K for Erban and Chapman approximation 
@@ -745,7 +763,7 @@ function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, bc_params::BCP
     corr_arr = [corr_vec[j][i] for i=1:2, j=1:n_abs]
     P .= Precomp_P.*corr_arr
     #by CLT approx dist for number of virtual particles to have reacted
-    xi = randn(TF, 2,n_abs).*sqrt.((P.*(1 .-P)))
+    xi = randn(TF, 2,n_abs).*sqrt.(abs.(P.*(1 .-P)))
     #catching places where all mass has been removed
     xi = [effective_v_particles[i,j]>0 ? xi[i,j]./sqrt(effective_v_particles[i,j]) : 0 for i in 1:2, j in 1:n_abs]
     ratios = max.(min.((1 .-P) + xi,1),0)
@@ -1389,7 +1407,7 @@ function PSP_model_record_phi_local_diff!(gphi::AbstractArray{T,3},f_phi::Abstra
     return nothing
 end
 
-function PSP_model_record_reacting_mass!(edge_mean::AbstractArray{T,1}, edge_squared::AbstractArray{T,1}, f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2}, turb_k_e::T, bc_interact::BitArray{3}, dt::T, initial_condition::Union{String,Tuple{String,Vararg}},  p_params::PSPParams{T}, psi_mesh::PsiGrid{T}, space_cells::CellGrid{T}, bc_params::BCParams{T}, verbose::Bool=false) where T<:AbstractFloat
+function PSP_model_record_reacting_mass!(edge_mean::AbstractArray{T,1}, edge_squared::AbstractArray{T,1}, edge_squared_v::AbstractArray{T,1}, f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2}, turb_k_e::T, bc_interact::BitArray{3}, dt::T, initial_condition::Union{String,Tuple{String,Vararg}},  p_params::PSPParams{T}, psi_mesh::PsiGrid{T}, space_cells::CellGrid{T}, bc_params::BCParams{T}, verbose::Bool=false) where T<:AbstractFloat
     omega_mean=p_params.omega_bar
     omega_sigma_2 = p_params.omega_sigma_2
     T_omega = p_params.T_omega
@@ -1506,13 +1524,18 @@ function PSP_model_record_reacting_mass!(edge_mean::AbstractArray{T,1}, edge_squ
         dphi .+= reaction
         phip[:,:,1+1] = phip[:,:,1]+dphi
         if !(initial_condition == "triple delta")
-            phip[:,:,t+1] = phip[:,:,t+1].*(phip[:,:,t+1].>0) #forcing positive concentration
+            phip[:,:,1+1] = phip[:,:,1+1].*(phip[:,:,1+1].>0) #forcing positive concentration
         end
         eval_by_cell!(function (i,j,cell_p)
             if i==1
                 edge_mean[t] += sum(phip[1,cell_p[bc_interact[cell_p,t,2]],1+1]) / (length(cell_p)*space_cells.x_res)
                 # println(length(cell_p),' ', edge_mean[t],' ',sum(phip[1,cell_p[bc_interact[cell_p,t,2]],t+1]) / (length(cell_p)*space_cells.x_res))
                 edge_squared[t] += sum(phip[1,cell_p[bc_interact[cell_p,t,2]],1+1].^2) / (length(cell_p)*space_cells.x_res)
+                if t>=2
+                    v_t=y_pos[cell_p[bc_interact[cell_p,t,2]],t]-y_pos[cell_p[bc_interact[cell_p,t,2]],t-1]
+                    println(maximum(v_t),' ',minimum(v_t))
+                    edge_squared_v[t-1] += sum(v_t.*phip[1,cell_p[bc_interact[cell_p,t,2]],1].^2) / (length(cell_p)*space_cells.x_res)
+                end
             end
             return nothing
         end,  x_pos[:,t], y_pos[:,t], space_cells)
