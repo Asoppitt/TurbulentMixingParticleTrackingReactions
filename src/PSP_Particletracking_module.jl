@@ -4,6 +4,7 @@ using Random, Distributions#, Plots
 import StatsBase as sb
 import LinearAlgebra as la
 import Statistics as st
+import Base.getindex, Base.setindex!, Base.size, Base.length, Base.iterate, Base.ndims, Base.copyto!
 
 export cell_grid,BC_params,psi_grid,motion_params,PSP_motion_bc_params,
 particle_motion_model, PSP_model!, particle_motion_model_ref_start, PSP_model_record_phi_local_diff!,
@@ -21,6 +22,8 @@ end
 
 struct PsiGrid{T<:AbstractFloat}
     psi_partions_num ::Int
+    psi_partions_num_1 ::Int
+    psi_partions_num_2 ::Int
     phi_domain ::AbstractVector{T}
     psi_1 ::AbstractVector{T}
     psi_2 ::AbstractVector{T}
@@ -31,16 +34,93 @@ struct PSPParams{T<:AbstractFloat}
     omega_sigma_2::T
     omega_min::T
     T_omega::T
+    omega_dist::Symbol
     c_phi::T
     c_t::T
     reaction_form :: Tuple{Function, Function}
 end
 
-struct MotionParams{T<:AbstractFloat}
+#structures to hold the data needed for Omega
+abstract type Omega{AbstractFloat,Distribution} end
+
+struct OmegaG{T}<:Omega{T,Gamma}
+    omega::Vector{T}
+    dist::Gamma
+    omega_bar::T
+    omega_sigma_2::T
+    omega_min::T
+    T_omega::T
+    inv_T_omega::T
+end
+
+struct OmegaL{T}<:Omega{T,LogNormal}
+    omega::Vector{T}
+    log_omega::Vector{T}
+    dist::LogNormal
+    omega_bar::T
+    omega_sigma_2::T
+    omega_min::T
+    T_omega::T
+    log_omega_bar::T
+    log_sigma_2::T
+    inv_T_omega::T
+end
+
+function copyto!(o::O,a...) where O<:Omega{T,Dist} where T<:AbstractFloat where Dist<:Distribution
+    copyto!(o.omega, a...)
+    return nothing
+end
+
+function ndims(o::O) where O<:Omega{T,Dist} where T<:AbstractFloat where Dist<:Distribution
+    return 1
+end
+
+function ndims(t::T2) where T2<:Type{O} where O<:Omega{T,Dist} where T<:AbstractFloat where Dist<:Distribution
+    return 1
+end
+
+function getindex(o::O, i...) where O<:Omega{T,Dist} where T<:AbstractFloat where Dist<:Distribution
+    return o.omega[i...]
+end
+
+function getindex(o::O, i::I) where O<:Omega{T,Dist} where T<:AbstractFloat where Dist<:Distribution where I<:AbstractArray
+    return o.omega[i]
+end
+
+function setindex!(o::O, info::T2, i...) where T2<:Union{TA,T} where TA<:AbstractArray{T} where O<:Omega{T,Dist} where T<:AbstractFloat where Dist<:Distribution
+    o.omega[i...]=info
+    return nothing
+end
+
+function setindex!(o::O, info::T2, i::I ) where T2<:Union{TA,T} where TA<:AbstractArray{T} where O<:Omega{T,Dist} where T<:AbstractFloat where Dist<:Distribution where I<:AbstractArray
+    o.omega[i]=info
+    return nothing
+end
+
+function length(o::O) where O<:Omega{T,Dist} where T<:AbstractFloat where Dist<:Distribution
+    return length(o.omega)
+end
+
+function size(o::O) where O<:Omega{T,Dist} where T<:AbstractFloat where Dist<:Distribution
+    return size(o.omega)
+end
+
+function size(o::O, i::I) where O<:Omega{T,Dist} where T<:AbstractFloat where Dist<:Distribution where I<:Integer
+    return size(o.omega, i)
+end
+
+function iterate(o::O) where O<:Omega{T,Dist} where T<:AbstractFloat where Dist<:Distribution
+    return iterate(o.omega)
+end
+
+function iterate(o::O, i::I) where O<:Omega{T,Dist} where T<:AbstractFloat where Dist<:Distribution where I<:Integer
+    return iterate(o.omega, i)
+end
+struct MotionParams{T<:AbstractFloat,T2<:Union{AbstractFloat,Tuple{Function,Function}}}
     omega_bar::T
     C_0::T
     B::T
-    u_mean::T
+    u_mean::T2
 end
 
 struct BCParams{T<:AbstractFloat, Tvp<:Real, T_corr<:Union{Nothing, Function, Tuple{Function,Function}}, binary}
@@ -52,20 +132,33 @@ struct BCParams{T<:AbstractFloat, Tvp<:Real, T_corr<:Union{Nothing, Function, Tu
     reacting_boundaries::AbstractArray{Bool}#which boundary(ies) react
 end
 
+function Omega(dist::D,np::I,p_params::PSPParams{T}) where I<:Integer where D<:Gamma where T<:AbstractFloat
+    omega=T.(rand(dist,np))
+    return OmegaG(omega,dist,p_params.omega_bar,p_params.omega_sigma_2,p_params.omega_min,p_params.T_omega,1/p_params.T_omega)
+end
+
+function Omega(dist::D,np::I,p_params::PSPParams{T}) where I<:Integer where D<:LogNormal where T<:AbstractFloat
+    omega=T.(rand(dist,np))
+    return OmegaL(omega,log.(omega),dist,p_params.omega_bar,p_params.omega_sigma_2,p_params.omega_min,p_params.T_omega,log(p_params.omega_bar),1/p_params.T_omega,varlogx(dist))
+end
+
 function cell_grid(x_res ::Int,y_res ::Int,length_domain ::T,height_domain ::T) where T<:AbstractFloat #constructor for CellGrid
     return CellGrid(x_res,y_res,length_domain,height_domain,LinRange(0,length_domain,x_res+1),LinRange(0,height_domain,y_res+1))
 end
 
 function psi_grid(psi_partions_num ::Int, phi_domain ::AbstractVector{T}) where T<:AbstractFloat #constructor for PsiGrid
-    return PsiGrid(psi_partions_num, phi_domain,LinRange(phi_domain[1], phi_domain[2], psi_partions_num+1),LinRange(phi_domain[1], phi_domain[2], psi_partions_num+1))
+    return PsiGrid(psi_partions_num,psi_partions_num,psi_partions_num, phi_domain,LinRange(phi_domain[1], phi_domain[2], psi_partions_num+1),LinRange(phi_domain[1], phi_domain[2], psi_partions_num+1))
+end
+function psi_grid(psi_partions_num1 ::Int,psi_partions_num2 ::Int, phi_domain ::AbstractVector{T}) where T<:AbstractFloat #constructor for PsiGrid
+    return PsiGrid(psi_partions_num1,psi_partions_num1,psi_partions_num2, phi_domain,LinRange(phi_domain[1], phi_domain[2], psi_partions_num1+1),LinRange(phi_domain[1], phi_domain[2], psi_partions_num2+1))
 end
 
-function PSP_params(omega_bar::T, omega_sigma_2::T,omega_min::T, c_phi::T, c_t::T, react_func=((x,y)->0,(x,y)->0)) where T<:AbstractFloat
+function PSP_params(omega_bar::T, omega_sigma_2::T,omega_min::T, c_phi::T, c_t::T, react_func=((x,y)->0,(x,y)->0), omega_dist=:Gamma::Symbol; omega_t=1/omega_bar) where T<:AbstractFloat
     (omega_bar <= omega_min) && throw(DomainError(omega_min,"omega_min must be less than omega_bar"))
-    return PSPParams(omega_bar, omega_sigma_2, omega_min, 1/omega_bar, c_phi, c_t, react_func)
+    return PSPParams(omega_bar, omega_sigma_2, omega_min, omega_t, omega_dist, c_phi, c_t, react_func)
 end
 
-function motion_params(omega_bar::T,C_0::T, B_format::String, u_mean::T) where T<:AbstractFloat
+function motion_params(omega_bar::T,C_0::T, B_format::String, u_mean::T2) where T<:AbstractFloat where T2<:Union{AbstractFloat,Tuple{Function,Function}}
     if B_format == "Decay"
         return MotionParams(omega_bar, C_0, (1+T(1.5)*C_0), u_mean)
     elseif B_format == "Constant"
@@ -103,8 +196,8 @@ function BC_params(bc_k::T, C_0::T, B_format::String, num_vp::Tvp; corr_func::T_
     end
 end
 
-function PSP_motion_bc_params(omega_bar::T, omega_sigma_2::T,omega_min::T, C_0::T, B_format::String, c_phi::T, c_t::T,u_mean::T,bc_k::T,num_vp::Real; corr_func::T_corr=nothing, bulk_reaction=((x,y)->0,(x,y)->0), reacting_boundaries::AbstractArray{String}=["lower"]) where T<:AbstractFloat where T_corr<:Union{Nothing, Function}
-    return PSP_params(omega_bar, omega_sigma_2,omega_min, c_phi, c_t, bulk_reaction), motion_params(omega_bar,C_0, B_format, u_mean), BC_params(bc_k, C_0, B_format, num_vp, corr_func=corr_func,reacting_boundaries=reacting_boundaries)
+function PSP_motion_bc_params(omega_bar::T, omega_sigma_2::T,omega_min::T, C_0::T, B_format::String, c_phi::T, c_t::T,u_mean::T2,bc_k::T,num_vp::Real; corr_func::T_corr=nothing, bulk_reaction=((x,y)->0,(x,y)->0), reacting_boundaries::AbstractArray{String}=["lower"], omega_dist=:Gamma::Symbol, omega_t=1/omega_bar) where T<:AbstractFloat where T_corr<:Union{Nothing, Function}  where T2<:Union{AbstractFloat,Tuple{Function,Function}}
+    return PSP_params(omega_bar, omega_sigma_2,omega_min, c_phi, c_t, bulk_reaction, omega_dist,omega_t=omega_t), motion_params(omega_bar,C_0, B_format, u_mean), BC_params(bc_k, C_0, B_format, num_vp, corr_func=corr_func,reacting_boundaries=reacting_boundaries)
 end
 
 function assign_pm!(phi_pm::Matrix{Int}, phi_array_t::Array{T}, particles::Vector{Int}, cell_points::Vector{Int}) where T<:AbstractFloat
@@ -128,7 +221,7 @@ function assign_pm_single!(phi_pm::Matrix{Int}, phi_array_t::Array{T}, particles
     for particle in particles
         !in(particle, cell_points) && throw(ArgumentError("Particles must be in cell"))
         cell_points_set_ = copy(cell_points_set)
-        while true
+        for attempt_count=1:length(cell_points)
             try_pm = rand(cell_points_set_) 
             test_dot = la.dot((phi_array_t[:,try_pm[1]]-phi_array_t[:,particle]),(phi_array_t[:,phi_pm[known_index,particle]]-phi_array_t[:,particle]))
             if  test_dot<= 0
@@ -136,6 +229,7 @@ function assign_pm_single!(phi_pm::Matrix{Int}, phi_array_t::Array{T}, particles
                 break
             end
             setdiff!(cell_points_set_,try_pm)
+            attempt_count == length(cell_points) && throw(DomainError(cell_points))
         end
     end
     return nothing
@@ -238,11 +332,11 @@ function pm_check_and_recal_for_cell_change!(phi_pm::Matrix{Int}, phi_array_t::A
     return nothing
 end
 
-function set_phi_as_ic_up1!(phi_array::Array{TF,3}, t_index::Int) where TF<:AbstractFloat
+function set_phi_as_ic_up1!(phi_array::Array{TF,3}, t_index::Int, val=TF(1)::TF) where TF<:AbstractFloat
     #Initial_condition == "Uniform phi1"
     nparticles = size(phi_array)[2]
     phi_array[2,:,t_index] = abs.(phi_eps*randn(TF, nparticles)) #pdf can't find zeros
-    phi_array[1,:,t_index] .= 1 
+    phi_array[1,:,t_index] .= val
     return nothing
 end
 function set_phi_as_ic_empty!(phi_array::Array{TF,3}, t_index::Int) where TF<:AbstractFloat
@@ -252,7 +346,7 @@ function set_phi_as_ic_empty!(phi_array::Array{TF,3}, t_index::Int) where TF<:Ab
     return nothing
 end
 #using subset of particles, mainly for inflow
-function set_phi_as_ic_up1!(phi_array::Array{TF,3}, t_index::Int, subset_indicies) where TF<:AbstractFloat
+function set_phi_as_ic_up1!(phi_array::Array{TF,3}, t_index::Int, subset_indicies::IA) where TF<:AbstractFloat where IA<:AbstractArray{I} where I<:Integer
     #Initial_condition == "Uniform phi1"
     nparticles = size(phi_array[:,subset_indicies,:])[2]
     phi_array[2,subset_indicies,t_index] = abs.(phi_eps*randn(TF, nparticles)) #pdf can't find zeros
@@ -486,6 +580,8 @@ function set_phi_as_ic!(phi_array::Array{TF,3},IC_type::Tuple{String,Vararg},xp:
     IC_type_str=lowercase(IC_type[1])
     if length(IC_type)==1
         set_phi_as_ic!(phi_array,IC_type[1],xp,yp,space_cells,t_index)
+    elseif IC_type_str == "uniform phi_1"
+        set_phi_as_ic_up1!(phi_array,t_index,IC_type[2:end]...)
     elseif IC_type_str == "double delta difference"
         set_phi_as_ic_dd_diff!(phi_array,IC_type[2],t_index)
     elseif IC_type_str == "2 layers difference"
@@ -1630,7 +1726,7 @@ function make_f_phi_no_PSP!(f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2
     return nothing
 end
 
-#constant turb_k_e
+#constant turb_k_e TODO:integrate with rewritten api 
 function make_f_phi_no_PSP!(f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2}, turb_k_e::T, bc_interact::BitArray{3}, initial_condition::Union{String,Tuple{String,Vararg}}, psi_mesh::PsiGrid{T}, space_cells::CellGrid{T}, bc_params::BCParams{T}, verbose::Bool=false) where T<:AbstractFloat
     np, nt = size(x_pos)
     nt-=1
