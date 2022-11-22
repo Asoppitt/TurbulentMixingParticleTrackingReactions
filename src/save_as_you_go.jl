@@ -356,7 +356,7 @@ function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Inte
                 (mom_2[1,t-(n_chunks)*chunk_length] = mean(phip[1,:].^2))
                 (mom_2[2,t-(n_chunks)*chunk_length] = mean(phip[2,:].^2))
             end
-            verbose && print(t,' ',mean(phip,dims=2),means[1,t-(n_chunks)*chunk_length],',',means[2,t-(n_chunks)*chunk_length],' ')
+            verbose && print(t,' ')
         end
         write(foldername*'/'*string(chunk_length*(n_chunks)+1)*'_'*string(nt)*"data",f_phi)
         write(foldername*'/'*string(chunk_length*(n_chunks)+1)*'_'*string(nt)*"array_shape",[i for i in size(f_phi)])
