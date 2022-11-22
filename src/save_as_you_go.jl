@@ -294,7 +294,7 @@ function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Inte
     omega0_dist =  make_omega_dist(p_params)#this should now match long term distribution of omega
     omegap = Omega(omega0_dist,np,p_params)
     
-    celli= Array{Array{Int,1},2}(undef,y_res,x_res)
+    celli= Array{Array{Int,1},2}(undef,space_cells.y_res,space_cells.x_res)
     #assign boundary particles and count cell_particles
     eval_by_cell!((i,j,cell_particles)-> (assign_pm!(phi_pm, phip, cell_particles, cell_particles);
         celli[i,j] = cell_particles;
