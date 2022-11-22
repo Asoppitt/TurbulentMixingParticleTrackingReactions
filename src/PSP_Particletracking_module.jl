@@ -1709,9 +1709,6 @@ function make_f_phi_no_PSP!(f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2
         set_phi_as_ic_normboth!(phip,1)
     elseif initial_condition[1] == "double delta difference"
         set_phi_as_ic_dd_diff!(phip,initial_condition[2],1)
-    elseif initial_condition[1] == "2 layers difference"
-        set_phi_as_ic_2l_diff!(phip,initial_condition[2],y_pos[:,1],space_cells,1)
-    else
         throw(ArgumentError("Not a valid intitial condition"))
     end
     assign_f_phi!(f_phi,phip[:,:,1], x_pos[:,1], y_pos[:,1], psi_mesh, space_cells,1)
