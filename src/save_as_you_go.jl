@@ -273,8 +273,8 @@ function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Inte
 
     x_pos = zeros(T, np)
     y_pos = zeros(T, np)
-    x_pos = space_cells.length_domain.*rand(float_type, np)
-    y_pos = space_cells.height_domain.*rand(float_type, np)
+    x_pos = space_cells.length_domain.*rand(T, np)
+    y_pos = space_cells.height_domain.*rand(T, np)
 
     if typeof(u_mean)==T
         ux = randn(T, np).*sqrt.(T(2/3) .*turb_k_e).+u_mean
@@ -307,8 +307,8 @@ function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Inte
     t_decorr_m = T(1) ./(c_t.*omegap[phi_pm[2,:]]).*rand(T,np)
 
     if record_moments
-        means=zeros(float_type,2,ceil(Int,chunk_length/saveing_rate_moments))
-        mom_2=zeros(float_type,2,ceil(Int,chunk_length/saveing_rate_moments))
+        means=zeros(T,2,ceil(Int,chunk_length/saveing_rate_moments))
+        mom_2=zeros(T,2,ceil(Int,chunk_length/saveing_rate_moments))
     end
 
     for chunk=0:n_chunks-1
@@ -340,8 +340,8 @@ function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Inte
     if (n_chunks)*chunk_length < nt
         f_phi=zeros(T,psi_mesh.psi_partions_num_1, psi_mesh.psi_partions_num_2, space_cells.y_res, space_cells.x_res, nt-(n_chunks)*chunk_length )
         if record_moments
-            means=zeros(float_type,2,nt-(n_chunks)*chunk_length)
-            mom_2=zeros(float_type,2,nt-(n_chunks)*chunk_length)
+            means=zeros(T,2,nt-(n_chunks)*chunk_length)
+            mom_2=zeros(T,2,nt-(n_chunks)*chunk_length)
         end
         for (i,t) in enumerate(((n_chunks)*chunk_length+1):nt)
             bc_interact=particle_motion_model_step!(x_pos,y_pos, ux,uy, turb_k_e, m_params, dt, space_cells, np)
@@ -380,8 +380,8 @@ function no_psp_motion_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T
     uy = randn(T, np).*sqrt.(T(2/3) .*turb_k_e)
     x_pos = zeros(T, np)
     y_pos = zeros(T, np)
-    x_pos = space_cells.length_domain.*rand(float_type, np)
-    y_pos = space_cells.height_domain.*rand(float_type, np)
+    x_pos = space_cells.length_domain.*rand(T, np)
+    y_pos = space_cells.height_domain.*rand(T, np)
 
     phip = zeros(T, (2, np,1)) #scalar concentration at these points
 
@@ -391,8 +391,8 @@ function no_psp_motion_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T
     assign_f_phi!(f_phi,phip, x_pos, y_pos, psi_mesh, space_cells,1)
 
     if record_moments
-        means=zeros(float_type,2,chunk_length)
-        mom_2=zeros(float_type,2,chunk_length)
+        means=zeros(T,2,chunk_length)
+        mom_2=zeros(T,2,chunk_length)
     end
 
     for chunk=0:n_chunks-1
@@ -419,8 +419,8 @@ function no_psp_motion_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T
     if (n_chunks)*chunk_length < nt
         f_phi=zeros(T,psi_mesh.psi_partions_num_1, psi_mesh.psi_partions_num_2, space_cells.y_res, space_cells.x_res, nt-(n_chunks)*chunk_length )
         if record_moments
-            means=zeros(float_type,2,nt-(n_chunks)*chunk_length)
-            mom_2=zeros(float_type,2,nt-(n_chunks)*chunk_length)
+            means=zeros(T,2,nt-(n_chunks)*chunk_length)
+            mom_2=zeros(T,2,nt-(n_chunks)*chunk_length)
         end
         for t in ((n_chunks)*chunk_length+1):nt
             bc_interact=particle_motion_model_step!(x_pos,y_pos, ux,uy, turb_k_e, m_params, dt, space_cells, np)
