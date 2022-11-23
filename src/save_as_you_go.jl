@@ -1,5 +1,6 @@
 include("PSP_Particletracking_module.jl")
 # module ContinuousSaving
+export no_psp_motion_model!, PSP_model!
 
 function particle_motion_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractArray{T,1}, ux::AbstractArray{T,1},uy::AbstractArray{T,1}, turb_k_e::T, m_params::MotionParams{T,T}, dt::T, space_cells::CellGrid{T},np::Integer) where T<:AbstractFloat
     "takes x_pos, y_pos, ux, uy and computes the correct velocity/position, stored in index
@@ -371,7 +372,7 @@ function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Inte
     return nothing
 end
 
-function no_psp_motion_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Integer, initial_condition::Union{String,Tuple{String,Vararg}}, m_params::MotionParams{T}, p_params::PSPParams{T}, psi_mesh::PsiGrid{T}, space_cells::CellGrid{T}, bc_params::BCParams{T}, verbose::Bool=false, chunk_length::Integer=50; record_moments=false) where T<:AbstractFloat
+function no_psp_motion_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Integer, initial_condition::Union{String,Tuple{String,Vararg}}, m_params::MotionParams{T}, p_params::PSPParams{T}, psi_mesh::PsiGrid{T}, space_cells::CellGrid{T}, bc_params::BCParams{T}, verbose::Bool=false, chunk_length::Integer=50; record_moments=false, saveing_rate=1, saveing_rate_moments=saveing_rate) where T<:AbstractFloat
     nt-=1
     n_chunks=floor(Int, nt/chunk_length)
  
@@ -397,13 +398,16 @@ function no_psp_motion_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T
     for chunk=0:n_chunks-1
         for t in (chunk*chunk_length+1):((chunk+1)*chunk_length)
             bc_interact=particle_motion_model_step!(x_pos,y_pos, ux,uy, turb_k_e, m_params, dt, space_cells, np)
-            eval_by_cell!((i,j,cell_particles)-> (
+            bc_absorbtion!(phip,any(bc_interact[:,bc_params.reacting_boundaries], dims=2)[:,1],bc_params,1, precomp_P) #reactive bc is chosen by bc_params.reacting_boundaries
+            t%saveing_rate==0&&eval_by_cell!((i,j,cell_particles)-> (
                 assign_f_phi_cell!(f_phi,phip[:,cell_particles], psi_mesh, 1,j,t-chunk*chunk_length);
             return nothing) , x_pos, y_pos, space_cells)
-            record_moments && (means[1,t-chunk*chunk_length] = mean(phip[1,:]))
-            record_moments && (means[2,t-chunk*chunk_length] = mean(phip[2,:]))
-            record_moments && (mom_2[1,t-chunk*chunk_length] = mean(phip[1,:].^2))
-            record_moments && (mom_2[2,t-chunk*chunk_length] = mean(phip[2,:].^2))
+            if record_moments && t%saveing_rate_moments==0 
+                (means[1,t-chunk*chunk_length] = mean(phip[1,:]))
+                (means[2,t-chunk*chunk_length] = mean(phip[2,:]))
+                (mom_2[1,t-chunk*chunk_length] = mean(phip[1,:].^2))
+                (mom_2[2,t-chunk*chunk_length] = mean(phip[2,:].^2))
+            end
             verbose && print(t,' ')
         end
         write(foldername*'/'*string(chunk*chunk_length+1)*'_'*string((chunk+1)*chunk_length)*"data",f_phi)
@@ -423,13 +427,16 @@ function no_psp_motion_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T
         end
         for t in ((n_chunks)*chunk_length+1):nt
             bc_interact=particle_motion_model_step!(x_pos,y_pos, ux,uy, turb_k_e, m_params, dt, space_cells, np)
-            eval_by_cell!((i,j,cell_particles)-> (
+            bc_absorbtion!(phip,any(bc_interact[:,bc_params.reacting_boundaries], dims=2)[:,1],bc_params,1, precomp_P) #reactive bc is chosen by bc_params.reacting_boundaries
+            t%saveing_rate==0 && eval_by_cell!((i,j,cell_particles)-> (
                 assign_f_phi_cell!(f_phi,phip[:,cell_particles], psi_mesh, 1,j,t-(n_chunks)*chunk_length);
             return nothing) , x_pos, y_pos, space_cells)
-            record_moments && (means[1,t-(n_chunks)*chunk_length] = mean(phip[:,1]))
-            record_moments && (means[2,t-(n_chunks)*chunk_length] = mean(phip[:,2]))
-            record_moments && (mom_2[1,t-(n_chunks)*chunk_length] = mean(phip[:,1].^2))
-            record_moments && (mom_2[2,t-(n_chunks)*chunk_length] = mean(phip[:,2].^2))
+            if record_moments && t%saveing_rate_moments==0 
+                (means[1,t-n_chunks*chunk_length] = mean(phip[1,:]))
+                (means[2,t-n_chunks*chunk_length] = mean(phip[2,:]))
+                (mom_2[1,t-n_chunks*chunk_length] = mean(phip[1,:].^2))
+                (mom_2[2,t-n_chunks*chunk_length] = mean(phip[2,:].^2))
+            end
             verbose && print(t,' ')
         end
         write(foldername*'/'*string(chunk_length*(n_chunks)+1)*'_'*string(nt)*"data",f_phi)
