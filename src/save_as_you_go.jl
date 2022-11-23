@@ -383,6 +383,8 @@ function no_psp_motion_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T
     x_pos = space_cells.length_domain.*rand(T, np)
     y_pos = space_cells.height_domain.*rand(T, np)
 
+    precomp_P = min.(bc_params.bc_k.*sqrt.(bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
+    
     phip = zeros(T, (2, np,1)) #scalar concentration at these points
 
     f_phi=zeros(T,psi_mesh.psi_partions_num_1, psi_mesh.psi_partions_num_2, space_cells.y_res, space_cells.x_res, chunk_length)
