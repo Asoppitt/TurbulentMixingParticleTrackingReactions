@@ -315,7 +315,8 @@ function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Inte
             bc_interact=particle_motion_model_step!(x_pos,y_pos, ux,uy, turb_k_e, m_params, dt, space_cells, np)
             PSP_model_step!(x_pos,y_pos,phip,celli,omegap, t_decorr_m, t_decorr_p, phi_pm, bc_interact, dt, p_params,space_cells, bc_params,np,precomp_P)
             if t%saveing_rate==0
-                Threads.@threads for (ind, cell_parts) in pairs(celli)#pariticle-cell pairs are already defined, so use them for f_phi
+                Threads.@threads for ind in eachindex(celli)#pariticle-cell pairs are already defined, so use them for f_phi
+                    local cell_parts=celli[ind]
                     assign_f_phi_cell!(f_phi,phip[:,cell_parts], psi_mesh, ind[1],ind[2],ceil(Int,i/saveing_rate))
                 end
             end
