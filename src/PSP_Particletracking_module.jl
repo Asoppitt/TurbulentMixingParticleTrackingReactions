@@ -795,8 +795,8 @@ function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, turb_k_e::Vect
     effective_v_particles =( phip[:,abs_points,t_index].*bc_params.num_vp)
     #K for Erban and Chapman approximation 
     P = zeros(TF, 2,n_abs)
-    P[1,:] = min.(abs_k[1,:].*sqrt.(bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
-    P[2,:] = min.(abs_k[2,:].*sqrt.(bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
+    P[1,:] = min.(abs_k[1,:].*sqrt.(2*bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
+    P[2,:] = min.(abs_k[2,:].*sqrt.(2*bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
     #by CLT approx dist for number of virtual particles to have reacted
     xi = randn(TF, 2,n_abs).*sqrt.((P.*(1 .-P)))
     #catching places where all mass has been removed
@@ -873,8 +873,8 @@ function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, turb_k_e::Vect
     abs_k = bc_params.bc_k.*ones(2,n_abs)
     #K for Erban and Chapman approximation 
     P = zeros(TF,2,n_abs)
-    P[1,:] = min.(abs_k[1,:].*sqrt.(bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
-    P[2,:] = min.(abs_k[2,:].*sqrt.(bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
+    P[1,:] = min.(abs_k[1,:].*sqrt.(2*bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
+    P[2,:] = min.(abs_k[2,:].*sqrt.(2*bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
     ratios = 1 .-P #taking mean for limiting case
     phip[:, abs_points, t_index] = phip[:, abs_points, t_index].*ratios
     return nothing
@@ -1277,7 +1277,7 @@ function PSP_model!(f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2}, turb_
     c_t = p_params.c_t
     np, nt = size(x_pos)
     nt-=1
-    precomp_P = min.(bc_params.bc_k.*sqrt.(bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
+    precomp_P = min.(bc_params.bc_k.*sqrt.(2*bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
 
     phip = zeros(T, (2, np, 2)) #scalar concentration at these points
     phi_pm = zeros(Int, 2, np) #pm pairs for each particle
@@ -1407,7 +1407,7 @@ function PSP_model_record_phi_local_diff!(gphi::AbstractArray{T,3},f_phi::Abstra
     c_t = p_params.c_t
     np, nt = size(x_pos)
     nt-=1
-    precomp_P = min.(bc_params.bc_k.*sqrt.(bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
+    precomp_P = min.(bc_params.bc_k.*sqrt.(2*bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
 
     phip = zeros(T, (2, np, 2)) #scalar concentration at these points, 2 is at t+1, 1 is at t
     phi_pm = zeros(Int, 2, np) #pm pairs for each particle
@@ -1553,7 +1553,7 @@ function PSP_model_record_reacting_mass!(edge_mean::AbstractArray{T,1}, edge_squ
     c_t = p_params.c_t
     np, nt = size(x_pos)
     nt-=1
-    precomp_P = min.(bc_params.bc_k.*sqrt.(bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
+    precomp_P = min.(bc_params.bc_k.*sqrt.(2*bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
 
     phip = zeros(T, (2, np, 1+1)) #scalar concentration at these points
     phi_pm = zeros(Int, 2, np) #pm pairs for each particle
@@ -1727,7 +1727,7 @@ end
 function make_f_phi_no_PSP!(f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2}, turb_k_e::T, bc_interact::BitArray{3}, initial_condition::Union{String,Tuple{String,Vararg}}, psi_mesh::PsiGrid{T}, space_cells::CellGrid{T}, bc_params::BCParams{T}, verbose::Bool=false) where T<:AbstractFloat
     np, nt = size(x_pos)
     nt-=1
-    precomp_P = min.(bc_params.bc_k.*sqrt.(bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
+    precomp_P = min.(bc_params.bc_k.*sqrt.(2*bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
 
     phip = zeros(T, (2, np, nt+1)) #scalar concentration at these points
 
