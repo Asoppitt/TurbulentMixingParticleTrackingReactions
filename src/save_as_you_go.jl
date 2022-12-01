@@ -140,7 +140,7 @@ end
 function omega_step!(omegap::Omega{T,LogNormal},dt::T) where T<:AbstractFloat
     #E-M solver for LogNormal
     dw = sqrt(dt).*randn(T,size(omegap,1)) #random draws
-    omegap.log_omega[:] .+=  -(omegap.inv_T_omega).*(omegap.log_omega.+0.5*omegap.log_sigma_2).*dt.+sqrt.(2*omegap.inv_T_omega*omegap.log_sigma_2).*dw
+    omegap.log_omega[:] .+=  -(omegap.inv_T_omega).*(omegap.log_omega.+TF(0.5)*omegap.log_sigma_2).*dt.+sqrt.(2*omegap.inv_T_omega*omegap.log_sigma_2).*dw
 
     omegap[:] = exp.(omegap.log_omega.+omegap.log_omega_bar)
 
@@ -206,10 +206,10 @@ function PSP_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractArray{T,1},phi
     t_decorr_p[t_p0.&t_pm0] = 1 ./(c_t.*omegap[phi_pm[1,t_p0.&t_pm0]])
     t_decorr_m[t_m0.&t_pm0] = 1 ./(c_t.*omegap[phi_pm[2,t_m0.&t_pm0]])
 
-    phi_c = 0.5.*(phip[:,phi_pm[1,:],1]+phip[:,phi_pm[2,:],1])
+    phi_c = T(0.5).*(phip[:,phi_pm[1,:],1]+phip[:,phi_pm[2,:],1])
     diffusion = zeros(T, 2,np)
-    diffusion[1,:] = (phip[1,:]-phi_c[1,:]).*(exp.(-c_phi.*0.5.*omegap[:,1].*dt).-1.0)
-    diffusion[2,:] = (phip[2,:]-phi_c[2,:]).*(exp.(-c_phi.*0.5.*omegap[:,1].*dt).-1.0)
+    diffusion[1,:] = (phip[1,:]-phi_c[1,:]).*(exp.(-c_phi.*T(0.5).*omegap[:,1].*dt).-1.0)
+    diffusion[2,:] = (phip[2,:]-phi_c[2,:]).*(exp.(-c_phi.*T(0.5).*omegap[:,1].*dt).-1.0)
     dphi = diffusion 
     # ensuring mean 0 change
     # generating a random orthonormal basis
@@ -251,7 +251,7 @@ function PSP_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractArray{T,1},phi
 
     #reaction has to be done after mean zero correction - or it has no effect
     reaction = zeros(T, 2,np) # bulk reaction
-    reaction[1,:] = dt.*(p_params.reaction_form[1].(phip[1,:],phip[2,:]))#.*exp.(c_phi.*0.5.*omegap[:,t].*dt) #integration of reation term to match diffusion scheme, uncomment if reaction !=0
+    reaction[1,:] = dt.*(p_params.reaction_form[1].(phip[1,:],phip[2,:]))#.*exp.(c_phi.*T(0.5).*omegap[:,t].*dt) #integration of reation term to match diffusion scheme, uncomment if reaction !=0
     reaction[2,:] = dt.*(p_params.reaction_form[2].(phip[1,:],phip[2,:]))
     dphi .+= reaction
     phip[:,:] .+= dphi
@@ -268,7 +268,7 @@ function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Inte
         @warn "setting chunk_length to multiple of saveing_rates:" chunk_length = rate_lcm*ceil(Int,chunk_length)
     end
     n_chunks=floor(Int, nt/chunk_length)
-    precomp_P = min.(bc_params.bc_k*sqrt.(bc_params.B*pi*m_params.omega_bar/(m_params.D_mol+0.5*m_params.omega_bar*bc_params.C_0*turb_k_e)),1)
+    precomp_P = min.(bc_params.bc_k*sqrt.(bc_params.B*pi*m_params.omega_bar/(m_params.D_mol+T(0.5)*m_params.omega_bar*bc_params.C_0*turb_k_e)),1)
     
 
     x_pos = zeros(T, np)
@@ -383,7 +383,7 @@ function no_psp_motion_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T
     x_pos = space_cells.length_domain.*rand(T, np)
     y_pos = space_cells.height_domain.*rand(T, np)
 
-    precomp_P = min.(bc_params.bc_k*sqrt.(bc_params.B*pi*m_params.omega_bar/(m_params.D_mol+0.5*m_params.omega_bar*bc_params.C_0*turb_k_e)),1)
+    precomp_P = min.(bc_params.bc_k*sqrt.(bc_params.B*pi*m_params.omega_bar/(m_params.D_mol+T(0.5)*m_params.omega_bar*bc_params.C_0*turb_k_e)),1)
     
     phip = zeros(T, (2, np,1)) #scalar concentration at these points
 

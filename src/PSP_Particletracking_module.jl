@@ -363,10 +363,10 @@ function set_phi_as_ic_td!(phi_array::Array{TF,3}, t_index::Int) where TF<:Abstr
     local noise_term = randn(TF, nparticles)
 
     phi_array[1,delta_selector.=1,t_index] = -sqrt(3)/2 .+phi_eps .*noise_term[delta_selector.=1]
-    phi_array[2,delta_selector.=1,t_index] .= -0.5
+    phi_array[2,delta_selector.=1,t_index] .= -TF(0.5)
 
     phi_array[1,delta_selector.=2,t_index] = sqrt(3)/2 .+phi_eps .*noise_term[delta_selector.=2]
-    phi_array[2,delta_selector.=2,t_index] .= -0.5
+    phi_array[2,delta_selector.=2,t_index] .= -TF(0.5)
 
     phi_array[1,delta_selector.=3,t_index] .= phi_eps
     phi_array[2,delta_selector.=3,t_index] = 1.0 .+phi_eps .*noise_term[delta_selector.=3]
@@ -376,33 +376,33 @@ function set_phi_as_ic_2l!(phi_array::Array{TF,3},yp::Vector{TF},space_cells::Ce
     #Initial_condition == "2 layers"
     nparticles = size(phi_array)[2]
     local noise_term = randn(TF, nparticles)
-    # local uniform_noise = rand(nparticles).-0.5
+    # local uniform_noise = rand(nparticles).-TF(0.5)
 
-    phi_array[2,yp.>0.5*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.>0.5*space_cells.height_domain] )
-    phi_array[1,yp.>0.5*space_cells.height_domain,t_index] .= 1
+    phi_array[2,yp.>TF(0.5)*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.>TF(0.5)*space_cells.height_domain] )
+    phi_array[1,yp.>TF(0.5)*space_cells.height_domain,t_index] .= 1
 
-    phi_array[1,yp.<=0.5*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.<=0.5*space_cells.height_domain] )
-    phi_array[2,yp.<=0.5*space_cells.height_domain,t_index] .= 1 #.+ uniform_noise[yp[particles,1].<=0.5*height_domain].*0.05
+    phi_array[1,yp.<=TF(0.5)*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.<=TF(0.5)*space_cells.height_domain] )
+    phi_array[2,yp.<=TF(0.5)*space_cells.height_domain,t_index] .= 1 #.+ uniform_noise[yp[particles,1].<=TF(0.5)*height_domain].*0.05
     return nothing
 end
 function set_phi_as_ic_2l_one_empty!(phi_array::Array{TF,3},empty_layer::Integer,yp::Vector{TF},space_cells::CellGrid{TF}, t_index::Int) where TF<:AbstractFloat
     #Initial_condition == "1 layer scalar, 1 layer empty"
     nparticles = size(phi_array)[2]
     local noise_term = randn(TF, nparticles)
-    # local uniform_noise = rand(nparticles).-0.5
+    # local uniform_noise = rand(nparticles).-TF(0.5)
 
     if empty_layer==0
-        phi_array[2,yp.>0.5*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.>0.5*space_cells.height_domain] )
-        phi_array[1,yp.>0.5*space_cells.height_domain,t_index] .= 1
+        phi_array[2,yp.>TF(0.5)*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.>TF(0.5)*space_cells.height_domain] )
+        phi_array[1,yp.>TF(0.5)*space_cells.height_domain,t_index] .= 1
 
-        phi_array[1,yp.<=0.5*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.<=0.5*space_cells.height_domain] )
-        phi_array[2,yp.<=0.5*space_cells.height_domain,t_index] .= abs.(phi_eps*noise_term[yp.<=0.5*space_cells.height_domain] )
+        phi_array[1,yp.<=TF(0.5)*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.<=TF(0.5)*space_cells.height_domain] )
+        phi_array[2,yp.<=TF(0.5)*space_cells.height_domain,t_index] .= abs.(phi_eps*noise_term[yp.<=TF(0.5)*space_cells.height_domain] )
     elseif empty_layer==1
-        phi_array[2,yp.<=0.5*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.<=0.5*space_cells.height_domain] )
-        phi_array[1,yp.<=0.5*space_cells.height_domain,t_index] .= 1
+        phi_array[2,yp.<=TF(0.5)*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.<=TF(0.5)*space_cells.height_domain] )
+        phi_array[1,yp.<=TF(0.5)*space_cells.height_domain,t_index] .= 1
 
-        phi_array[1,yp.>0.5*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.>0.5*space_cells.height_domain] )
-        phi_array[2,yp.>0.5*space_cells.height_domain,t_index] .= abs.(phi_eps*noise_term[yp.>0.5*space_cells.height_domain] )
+        phi_array[1,yp.>TF(0.5)*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.>TF(0.5)*space_cells.height_domain] )
+        phi_array[2,yp.>TF(0.5)*space_cells.height_domain,t_index] .= abs.(phi_eps*noise_term[yp.>TF(0.5)*space_cells.height_domain] )
     end
     return nothing
 end
@@ -410,20 +410,20 @@ function set_phi_as_ic_2l_one_empty_x!(phi_array::Array{TF,3},empty_layer::Integ
     #Initial_condition == "1 layer scalar, 1 layer empty"
     nparticles = size(phi_array)[2]
     local noise_term = randn(TF, nparticles)
-    # local uniform_noise = rand(nparticles).-0.5
+    # local uniform_noise = rand(nparticles).-TF(0.5)
 
     if empty_layer==0
-        phi_array[2,xp.>0.5*space_cells.length_domain,t_index] = abs.(phi_eps*noise_term[xp.>0.5*space_cells.length_domain] )
-        phi_array[1,xp.>0.5*space_cells.length_domain,t_index] .= 1
+        phi_array[2,xp.>TF(0.5)*space_cells.length_domain,t_index] = abs.(phi_eps*noise_term[xp.>TF(0.5)*space_cells.length_domain] )
+        phi_array[1,xp.>TF(0.5)*space_cells.length_domain,t_index] .= 1
 
-        phi_array[1,xp.<=0.5*space_cells.length_domain,t_index] = abs.(phi_eps*noise_term[xp.<=0.5*space_cells.length_domain] )
-        phi_array[2,xp.<=0.5*space_cells.length_domain,t_index] .= abs.(phi_eps*noise_term[xp.<=0.5*space_cells.length_domain] )
+        phi_array[1,xp.<=TF(0.5)*space_cells.length_domain,t_index] = abs.(phi_eps*noise_term[xp.<=TF(0.5)*space_cells.length_domain] )
+        phi_array[2,xp.<=TF(0.5)*space_cells.length_domain,t_index] .= abs.(phi_eps*noise_term[xp.<=TF(0.5)*space_cells.length_domain] )
     elseif empty_layer==1
-        phi_array[2,xp.<=0.5*space_cells.length_domain,t_index] = abs.(phi_eps*noise_term[xp.<=0.5*space_cells.length_domain] )
-        phi_array[1,xp.<=0.5*space_cells.length_domain,t_index] .= 1
+        phi_array[2,xp.<=TF(0.5)*space_cells.length_domain,t_index] = abs.(phi_eps*noise_term[xp.<=TF(0.5)*space_cells.length_domain] )
+        phi_array[1,xp.<=TF(0.5)*space_cells.length_domain,t_index] .= 1
 
-        phi_array[1,xp.>0.5*space_cells.length_domain,t_index] = abs.(phi_eps*noise_term[xp.>0.5*space_cells.length_domain] )
-        phi_array[2,xp.>0.5*space_cells.length_domain,t_index] .= abs.(phi_eps*noise_term[xp.>0.5*space_cells.length_domain] )
+        phi_array[1,xp.>TF(0.5)*space_cells.length_domain,t_index] = abs.(phi_eps*noise_term[xp.>TF(0.5)*space_cells.length_domain] )
+        phi_array[2,xp.>TF(0.5)*space_cells.length_domain,t_index] .= abs.(phi_eps*noise_term[xp.>TF(0.5)*space_cells.length_domain] )
     end
     return nothing
 end
@@ -432,7 +432,7 @@ function set_phi_as_ic_vert_strip!(phi_array::Array{TF,3},left_edge::TF,right_ed
     #Initial_condition == "1 layer scalar, 1 layer empty"
     nparticles = size(phi_array)[2]
     local noise_term = randn(TF, nparticles)
-    # local uniform_noise = rand(nparticles).-0.5
+    # local uniform_noise = rand(nparticles).-TF(0.5)
     in_strip=(xp.>left_edge) .& (xp.<right_edge)
 
     phi_array[2,in_strip,t_index] = abs.(phi_eps*noise_term[in_strip] )
@@ -446,7 +446,7 @@ function set_phi_as_ic_vert_strip!(phi_array::Array{TF,3},left_edge::TF,right_ed
     #Initial_condition == "1 layer scalar, 1 layer empty"
     nparticles = size(phi_array)[2]
     local noise_term = randn(TF, nparticles)
-    # local uniform_noise = rand(nparticles).-0.5
+    # local uniform_noise = rand(nparticles).-TF(0.5)
     in_strip=(xp.>left_edge) .& (xp.<right_edge)
 
     phi_array[2,in_strip,t_index] = abs.(phi_eps*noise_term[in_strip] )
@@ -461,7 +461,7 @@ function set_phi_as_ic_vert_strip_diff!(phi_array::Array{TF,3},left_edge::TF,rig
     #Initial_condition == "2 layers difference"
     nparticles = size(phi_array)[2]
     local noise_term = randn(TF, nparticles)
-    # local uniform_noise = rand(nparticles).-0.5
+    # local uniform_noise = rand(nparticles).-TF(0.5)
     in_strip=(xp.>left_edge) .& (xp.<right_edge)
 
     phi_array[2,in_strip,t_index] .= K
@@ -477,7 +477,7 @@ function set_phi_as_ic_dd!(phi_array::Array{TF,3},t_index::Int) where TF<:Abstra
     nparticles = size(phi_array)[2]
     local noise_term = randn(TF, nparticles)
     local delta_selector = rand([true,false], nparticles)
-    # local uniform_noise = rand(nparticles).-0.5
+    # local uniform_noise = rand(nparticles).-TF(0.5)
 
     phi_array[2,delta_selector,t_index] = abs.(phi_eps*noise_term[delta_selector] )
     phi_array[1,delta_selector,t_index] .= 1 #.+ uniform_noise[delta_selector.==1].*0.05
@@ -490,10 +490,10 @@ function set_phi_as_ic_norm1!(phi_array::Array{TF,3}, t_index::Int) where TF<:Ab
     #Initial_condition == "Uniform phi1"
     nparticles = size(phi_array)[2]
     phi_array[2,:,t_index] = abs.(phi_eps*randn(TF, nparticles)) #pdf can't find zeros
-    phi_array[1,:,t_index] = randn(TF, nparticles)*0.5*(1/3).+0.5 #high amount of mass already in system, truncation shouldn't cause problems
+    phi_array[1,:,t_index] = randn(TF, nparticles)*TF(0.5)*(1/3).+TF(0.5) #high amount of mass already in system, truncation shouldn't cause problems
     reject=(phi_array[1,:,t_index].<=0) .| (phi_array[1,:,t_index].>1)
     while any(reject) #trucation via rejection sampling
-        phi_array[1,reject,t_index] = randn(TF, sum(reject))*0.5*(1/3) .+0.5
+        phi_array[1,reject,t_index] = randn(TF, sum(reject))*TF(0.5)*(1/3) .+TF(0.5)
         reject=(phi_array[1,:,t_index].<=0) .| (phi_array[1,:,t_index].>1)
     end
     return nothing
@@ -511,16 +511,16 @@ end
 function set_phi_as_ic_normboth!(phi_array::Array{TF,3}, t_index::Int) where TF<:AbstractFloat
     #Initial_condition == "Uniform phi1"
     nparticles = size(phi_array)[2]
-    phi_array[2,:,t_index] = randn(TF, nparticles)*0.5*(1/3).+0.5 #high amount of mass already in system, truncation shouldn't cause problems
+    phi_array[2,:,t_index] = randn(TF, nparticles)*TF(0.5)*(1/3).+TF(0.5) #high amount of mass already in system, truncation shouldn't cause problems
     reject=(phi_array[2,:,t_index].<=0) .| (phi_array[2,:,t_index].>1)
     while any(reject) #trucation via rejection sampling
-        phi_array[2,reject,t_index] = randn(TF, sum(reject))*0.5*(1/3) .+0.5
+        phi_array[2,reject,t_index] = randn(TF, sum(reject))*TF(0.5)*(1/3) .+TF(0.5)
         reject=(phi_array[2,:,t_index].<=0) .| (phi_array[2,:,t_index].>1)
     end
-    phi_array[1,:,t_index] = randn(TF, nparticles)*0.5*(1/3).+0.5 #high amount of mass already in system, truncation shouldn't cause problems
+    phi_array[1,:,t_index] = randn(TF, nparticles)*TF(0.5)*(1/3).+TF(0.5) #high amount of mass already in system, truncation shouldn't cause problems
     reject=(phi_array[1,:,t_index].<=0) .| (phi_array[1,:,t_index].>1)
     while any(reject) #trucation via rejection sampling
-        phi_array[1,reject,t_index] = randn(TF, sum(reject))*0.5*(1/3) .+0.5
+        phi_array[1,reject,t_index] = randn(TF, sum(reject))*TF(0.5)*(1/3) .+TF(0.5)
         reject=(phi_array[1,:,t_index].<=0) .| (phi_array[1,:,t_index].>1)
     end
     return nothing
@@ -531,7 +531,7 @@ function set_phi_as_ic_dd_diff!(phi_array::Array{TF,3}, K::TF, t_index::Int) whe
     nparticles = size(phi_array)[2]
     local noise_term = randn(TF, nparticles)
     local delta_selector = rand([true,false], nparticles)
-    # local uniform_noise = rand(nparticles).-0.5
+    # local uniform_noise = rand(nparticles).-TF(0.5)
 
     phi_array[2,delta_selector,t_index] .= sqrt(K)#.+(phi_eps*noise_term[delta_selector] )
     phi_array[1,delta_selector,t_index] .= sqrt(K)#.-(phi_eps*noise_term[delta_selector] )
@@ -544,13 +544,13 @@ function set_phi_as_ic_2l_diff!(phi_array::Array{TF,3},K::TF,yp::Vector{TF},spac
     #Initial_condition == "2 layers difference"
     nparticles = size(phi_array)[2]
     local noise_term = randn(TF, nparticles)
-    # local uniform_noise = rand(nparticles).-0.5
+    # local uniform_noise = rand(nparticles).-TF(0.5)
 
-    phi_array[2,yp.>0.5*space_cells.height_domain,t_index] .= sqrt(K) #.+abs.(phi_eps*noise_term[yp.>0.5*space_cells.height_domain] )
-    phi_array[1,yp.>0.5*space_cells.height_domain,t_index] .= sqrt(K)#.-abs.(phi_eps*noise_term[yp.>0.5*space_cells.height_domain] )
+    phi_array[2,yp.>TF(0.5)*space_cells.height_domain,t_index] .= sqrt(K) #.+abs.(phi_eps*noise_term[yp.>TF(0.5)*space_cells.height_domain] )
+    phi_array[1,yp.>TF(0.5)*space_cells.height_domain,t_index] .= sqrt(K)#.-abs.(phi_eps*noise_term[yp.>TF(0.5)*space_cells.height_domain] )
 
-    phi_array[1,yp.<=0.5*space_cells.height_domain,t_index] .= 1 #.- abs.(phi_eps*noise_term[yp.<=0.5*space_cells.height_domain] )
-    phi_array[2,yp.<=0.5*space_cells.height_domain,t_index] .= K #.+ abs.(phi_eps*noise_term[yp.<=0.5*space_cells.height_domain] )
+    phi_array[1,yp.<=TF(0.5)*space_cells.height_domain,t_index] .= 1 #.- abs.(phi_eps*noise_term[yp.<=TF(0.5)*space_cells.height_domain] )
+    phi_array[2,yp.<=TF(0.5)*space_cells.height_domain,t_index] .= K #.+ abs.(phi_eps*noise_term[yp.<=TF(0.5)*space_cells.height_domain] )
     return nothing
 end
 
@@ -798,8 +798,8 @@ function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, turb_k_e::Vect
     effective_v_particles =( phip[:,abs_points,t_index].*bc_params.num_vp)
     #K for Erban and Chapman approximation 
     P = zeros(TF, 2,n_abs)
-    P[1,:] = min.(abs_k[1,:].*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e),1))
-    P[2,:] = min.(abs_k[2,:].*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e),1))
+    P[1,:] = min.(abs_k[1,:].*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+TF(0.5)*bc_params.omega_bar*bc_params.C_0*turb_k_e),1))
+    P[2,:] = min.(abs_k[2,:].*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+TF(0.5)*bc_params.omega_bar*bc_params.C_0*turb_k_e),1))
     #by CLT approx dist for number of virtual particles to have reacted
     xi = randn(TF, 2,n_abs).*sqrt.((P.*(1 .-P)))
     #catching places where all mass has been removed
@@ -876,8 +876,8 @@ function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, turb_k_e::Vect
     abs_k = bc_params.bc_k.*ones(2,n_abs)
     #K for Erban and Chapman approximation 
     P = zeros(TF,2,n_abs)
-    P[1,:] = min.(abs_k[1,:].*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e),1))
-    P[2,:] = min.(abs_k[2,:].*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e),1))
+    P[1,:] = min.(abs_k[1,:].*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+TF(0.5)*bc_params.omega_bar*bc_params.C_0*turb_k_e),1))
+    P[2,:] = min.(abs_k[2,:].*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+TF(0.5)*bc_params.omega_bar*bc_params.C_0*turb_k_e),1))
     ratios = 1 .-P #taking mean for limiting case
     phip[:, abs_points, t_index] = phip[:, abs_points, t_index].*ratios
     return nothing
@@ -938,14 +938,14 @@ function particle_motion_model(x_pos::Array{T,2},y_pos::Array{T,2}, turb_k_e::Ar
     uxp = randn(T, np).*sqrt.(2/3 .*turb_k_e[:,1])
     uyp = randn(T, np).*sqrt.(2/3 .*turb_k_e[:,1])
     for t=1:nt
-        uxp = uxp+(-0.5*B*omega_bar*uxp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e[:,t].*omega_bar.*dt); 
-        uyp = uyp+(-0.5*B*omega_bar*uyp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e[:,t].*omega_bar.*dt); 
+        uxp = uxp+(-T(0.5)*B*omega_bar*uxp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e[:,t].*omega_bar.*dt); 
+        uyp = uyp+(-T(0.5)*B*omega_bar*uyp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e[:,t].*omega_bar.*dt); 
         for i in 1:space_cells.y_res
             in_y = space_cells.y_edges[i].<y_pos[:,t].<space_cells.y_edges[i+1]
             for j in 1:x_res
                 in_x = space_cells.x_edges[j].<x_pos[:,t].<space_cells.x_edges[j+1]
                 cell_particles = findall(in_x.&in_y)
-                turb_k_e[cell_particles,t+1].=0.5*(st.mean(uxp[cell_particles].^2)+st.mean(uyp[cell_particles].^2))*1.5 #turb_e_init;
+                turb_k_e[cell_particles,t+1].=T(0.5)*(st.mean(uxp[cell_particles].^2)+st.mean(uyp[cell_particles].^2))*1.5 #turb_e_init;
             end
         end
         uxp_full = u_mean .+ uxp
@@ -1014,8 +1014,8 @@ function particle_motion_model(x_pos::Array{T,2},y_pos::Array{T,2}, turb_k_e::T,
     uxp = randn(T, np).*sqrt.(2/3 .*turb_k_e)
     uyp = randn(T, np).*sqrt.(2/3 .*turb_k_e)
     for t=1:nt
-        uxp = uxp+(-0.5*B*omega_bar*uxp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
-        uyp = uyp+(-0.5*B*omega_bar*uyp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
+        uxp = uxp+(-T(0.5)*B*omega_bar*uxp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
+        uyp = uyp+(-T(0.5)*B*omega_bar*uyp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
         uxp_full = u_mean .+ uxp
         x_pos[:,t+1] = x_pos[:,t] + (uxp_full)*dt # random walk in x-direction
         y_pos[:,t+1] = y_pos[:,t] + uyp*dt # random walk in y-direction
@@ -1083,8 +1083,8 @@ function particle_motion_model_ref_start(x_pos::Array{T,2},y_pos::Array{T,2}, tu
     uxp = randn(T, np).*sqrt.(2/3 .*turb_k_e)
     uyp = randn(T, np).*sqrt.(2/3 .*turb_k_e)
     for t=1:nt
-        uxp = uxp+(-0.5*B*omega_bar*uxp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
-        uyp = uyp+(-0.5*B*omega_bar*uyp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
+        uxp = uxp+(-T(0.5)*B*omega_bar*uxp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
+        uyp = uyp+(-T(0.5)*B*omega_bar*uyp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
         uxp_full = u_mean .+ uxp
         x_pos[:,t+1] = x_pos[:,t] + (uxp_full)*dt # random walk in x-direction
         y_pos[:,t+1] = y_pos[:,t] + uyp*dt # random walk in y-direction
@@ -1209,11 +1209,11 @@ function PSP_model!(f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2}, turb_
         t_decorr_p[t_p0.&t_pm0] = 1 ./(c_t.*omegap[phi_pm[1,t_p0.&t_pm0],t])
         t_decorr_m[t_m0.&t_pm0] = 1 ./(c_t.*omegap[phi_pm[2,t_m0.&t_pm0],t])
 
-        phi_c = 0.5.*(phip[:,phi_pm[1,:],1]+phip[:,phi_pm[2,:],1])
+        phi_c = T(0.5).*(phip[:,phi_pm[1,:],1]+phip[:,phi_pm[2,:],1])
         diffusion = zeros(2,np)
-        diffusion[1,:] = (phip[1,:,1]-phi_c[1,:]).*(exp.(-c_phi.*0.5.*omegap[:,t].*dt).-1.0)
-        diffusion[2,:] = (phip[2,:,1]-phi_c[2,:]).*(exp.(-c_phi.*0.5.*omegap[:,t].*dt).-1.0)
-        # reaction = dt.*(reaction).*exp.(c_phi.*0.5.*omegap[:,t].*dt) #integration of reation term to match diffusion scheme, uncomment if reaction !=0
+        diffusion[1,:] = (phip[1,:,1]-phi_c[1,:]).*(exp.(-c_phi.*T(0.5).*omegap[:,t].*dt).-1.0)
+        diffusion[2,:] = (phip[2,:,1]-phi_c[2,:]).*(exp.(-c_phi.*T(0.5).*omegap[:,t].*dt).-1.0)
+        # reaction = dt.*(reaction).*exp.(c_phi.*T(0.5).*omegap[:,t].*dt) #integration of reation term to match diffusion scheme, uncomment if reaction !=0
         dphi = diffusion 
 
         # ensuring mean 0 change
@@ -1253,7 +1253,7 @@ function PSP_model!(f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2}, turb_
 
         #reaction has to be done after mean zero correction - or it has no effect
         reaction = zeros(T, 2,np) # body reaction
-        reaction[1,:] = dt.*(p_params.reaction_form[1].(phip[1,:,1],phip[2,:,1]))#.*exp.(c_phi.*0.5.*omegap[:,t].*dt) #integration of reation term to match diffusion scheme, uncomment if reaction !=0
+        reaction[1,:] = dt.*(p_params.reaction_form[1].(phip[1,:,1],phip[2,:,1]))#.*exp.(c_phi.*T(0.5).*omegap[:,t].*dt) #integration of reation term to match diffusion scheme, uncomment if reaction !=0
         reaction[2,:] = dt.*(p_params.reaction_form[2].(phip[1,:,1],phip[2,:,1]))
         dphi .+= reaction
         phip[:,:,1+1] = phip[:,:,1]+dphi
@@ -1280,7 +1280,7 @@ function PSP_model!(f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2}, turb_
     c_t = p_params.c_t
     np, nt = size(x_pos)
     nt-=1
-    precomp_P = min.(bc_params.bc_k*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e)),1)
+    precomp_P = min.(bc_params.bc_k*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+T(0.5)*bc_params.omega_bar*bc_params.C_0*turb_k_e)),1)
 
     phip = zeros(T, (2, np, 2)) #scalar concentration at these points
     phi_pm = zeros(Int, 2, np) #pm pairs for each particle
@@ -1341,10 +1341,10 @@ function PSP_model!(f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2}, turb_
         t_decorr_p[t_p0.&t_pm0] = 1 ./(c_t.*omegap[phi_pm[1,t_p0.&t_pm0],t])
         t_decorr_m[t_m0.&t_pm0] = 1 ./(c_t.*omegap[phi_pm[2,t_m0.&t_pm0],t])
 
-        phi_c = 0.5.*(phip[:,phi_pm[1,:],1]+phip[:,phi_pm[2,:],1])
+        phi_c = T(0.5).*(phip[:,phi_pm[1,:],1]+phip[:,phi_pm[2,:],1])
         diffusion = zeros(T, 2,np)
-        diffusion[1,:] = (phip[1,:,1]-phi_c[1,:]).*(exp.(-c_phi.*0.5.*omegap[:,1].*dt).-1.0)
-        diffusion[2,:] = (phip[2,:,1]-phi_c[2,:]).*(exp.(-c_phi.*0.5.*omegap[:,1].*dt).-1.0)
+        diffusion[1,:] = (phip[1,:,1]-phi_c[1,:]).*(exp.(-c_phi.*T(0.5).*omegap[:,1].*dt).-1.0)
+        diffusion[2,:] = (phip[2,:,1]-phi_c[2,:]).*(exp.(-c_phi.*T(0.5).*omegap[:,1].*dt).-1.0)
         dphi = diffusion 
         # ensuring mean 0 change
         # generating a random orthonormal basis
@@ -1384,7 +1384,7 @@ function PSP_model!(f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2}, turb_
 
         #reaction has to be done after mean zero correction - or it has no effect
         reaction = zeros(T, 2,np) # bulk reaction
-        reaction[1,:] = dt.*(p_params.reaction_form[1].(phip[1,:,1],phip[2,:,1]))#.*exp.(c_phi.*0.5.*omegap[:,t].*dt) #integration of reation term to match diffusion scheme, uncomment if reaction !=0
+        reaction[1,:] = dt.*(p_params.reaction_form[1].(phip[1,:,1],phip[2,:,1]))#.*exp.(c_phi.*T(0.5).*omegap[:,t].*dt) #integration of reation term to match diffusion scheme, uncomment if reaction !=0
         reaction[2,:] = dt.*(p_params.reaction_form[2].(phip[1,:,1],phip[2,:,1]))
         dphi .+= reaction
         phip[:,:,1+1] = phip[:,:,1]+dphi
@@ -1410,7 +1410,7 @@ function PSP_model_record_phi_local_diff!(gphi::AbstractArray{T,3},f_phi::Abstra
     c_t = p_params.c_t
     np, nt = size(x_pos)
     nt-=1
-    precomp_P = min.(bc_params.bc_k*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e)),1)
+    precomp_P = min.(bc_params.bc_k*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+T(0.5)*bc_params.omega_bar*bc_params.C_0*turb_k_e)),1)
 
     phip = zeros(T, (2, np, 2)) #scalar concentration at these points, 2 is at t+1, 1 is at t
     phi_pm = zeros(Int, 2, np) #pm pairs for each particle
@@ -1475,14 +1475,14 @@ function PSP_model_record_phi_local_diff!(gphi::AbstractArray{T,3},f_phi::Abstra
         t_decorr_p[t_p0.&t_pm0] = 1 ./(c_t.*omegap[phi_pm[1,t_p0.&t_pm0],t])
         t_decorr_m[t_m0.&t_pm0] = 1 ./(c_t.*omegap[phi_pm[2,t_m0.&t_pm0],t])
 
-        phi_c = 0.5.*(phip[:,phi_pm[1,:],1]+phip[:,phi_pm[2,:],1])
+        phi_c = T(0.5).*(phip[:,phi_pm[1,:],1]+phip[:,phi_pm[2,:],1])
         diffusion = zeros(T, 2,np)
-        diffusion[1,:] = (phip[1,:,1]-phi_c[1,:]).*(exp.(-c_phi.*0.5.*omegap[:,t].*dt).-1.0)
-        diffusion[2,:] = (phip[2,:,1]-phi_c[2,:]).*(exp.(-c_phi.*0.5.*omegap[:,t].*dt).-1.0)
+        diffusion[1,:] = (phip[1,:,1]-phi_c[1,:]).*(exp.(-c_phi.*T(0.5).*omegap[:,t].*dt).-1.0)
+        diffusion[2,:] = (phip[2,:,1]-phi_c[2,:]).*(exp.(-c_phi.*T(0.5).*omegap[:,t].*dt).-1.0)
         dphi = diffusion
         #the local diffusion for each particle
-        gamma[1,:] = c_phi.*0.5.*omegap[:,t].*(phip[1,:,1]-phi_c[1,:])
-        gamma[2,:] = c_phi.*0.5.*omegap[:,t].*(phip[2,:,1]-phi_c[2,:])
+        gamma[1,:] = c_phi.*T(0.5).*omegap[:,t].*(phip[1,:,1]-phi_c[1,:])
+        gamma[2,:] = c_phi.*T(0.5).*omegap[:,t].*(phip[2,:,1]-phi_c[2,:])
 
         # ensuring mean 0 change
         # generating a random orthonormal basis
@@ -1522,7 +1522,7 @@ function PSP_model_record_phi_local_diff!(gphi::AbstractArray{T,3},f_phi::Abstra
 
         #reaction has to be done after mean zero correction - or it has no effect
         reaction = zeros(T, 2,np) # body reaction
-        reaction[1,:] = dt.*(p_params.reaction_form[1].(phip[1,:,1],phip[2,:,1]))#.*exp.(c_phi.*0.5.*omegap[:,t].*dt) #integration of reation term to match diffusion scheme, uncomment if reaction !=0
+        reaction[1,:] = dt.*(p_params.reaction_form[1].(phip[1,:,1],phip[2,:,1]))#.*exp.(c_phi.*T(0.5).*omegap[:,t].*dt) #integration of reation term to match diffusion scheme, uncomment if reaction !=0
         reaction[2,:] = dt.*(p_params.reaction_form[2].(phip[1,:,1],phip[2,:,1]))
         dphi .+= reaction
         phip[:,:,1+1] = phip[:,:,1]+dphi
@@ -1556,7 +1556,7 @@ function PSP_model_record_reacting_mass!(edge_mean::AbstractArray{T,1}, edge_squ
     c_t = p_params.c_t
     np, nt = size(x_pos)
     nt-=1
-    precomp_P = min.(bc_params.bc_k*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e)),1)
+    precomp_P = min.(bc_params.bc_k*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+T(0.5)*bc_params.omega_bar*bc_params.C_0*turb_k_e)),1)
 
     phip = zeros(T, (2, np, 1+1)) #scalar concentration at these points
     phi_pm = zeros(Int, 2, np) #pm pairs for each particle
@@ -1615,11 +1615,11 @@ function PSP_model_record_reacting_mass!(edge_mean::AbstractArray{T,1}, edge_squ
         t_decorr_p[t_p0.&t_pm0] = 1 ./(c_t.*omegap[phi_pm[1,t_p0.&t_pm0],t])
         t_decorr_m[t_m0.&t_pm0] = 1 ./(c_t.*omegap[phi_pm[2,t_m0.&t_pm0],t])
 
-        phi_c = 0.5.*(phip[:,phi_pm[1,:],1]+phip[:,phi_pm[2,:],1])
+        phi_c = T(0.5).*(phip[:,phi_pm[1,:],1]+phip[:,phi_pm[2,:],1])
         diffusion = zeros(T, 2,np)
-        diffusion[1,:] = (phip[1,:,1]-phi_c[1,:]).*(exp.(-c_phi.*0.5.*omegap[:,t].*dt).-1.0)
-        diffusion[2,:] = (phip[2,:,1]-phi_c[2,:]).*(exp.(-c_phi.*0.5.*omegap[:,t].*dt).-1.0)
-        # reaction = dt.*(reaction).*exp.(c_phi.*0.5.*omegap[:,t].*dt) #integration of reation term to match diffusion scheme, uncomment if reaction !=0
+        diffusion[1,:] = (phip[1,:,1]-phi_c[1,:]).*(exp.(-c_phi.*T(0.5).*omegap[:,t].*dt).-1.0)
+        diffusion[2,:] = (phip[2,:,1]-phi_c[2,:]).*(exp.(-c_phi.*T(0.5).*omegap[:,t].*dt).-1.0)
+        # reaction = dt.*(reaction).*exp.(c_phi.*T(0.5).*omegap[:,t].*dt) #integration of reation term to match diffusion scheme, uncomment if reaction !=0
         dphi = diffusion 
 
         # ensuring mean 0 change
@@ -1660,7 +1660,7 @@ function PSP_model_record_reacting_mass!(edge_mean::AbstractArray{T,1}, edge_squ
 
         #reaction has to be done after mean zero correction - or it has no effect
         reaction = zeros(T, 2,np) # body reaction
-        reaction[1,:] = dt.*(p_params.reaction_form[1].(phip[1,:,1],phip[2,:,1]))#.*exp.(c_phi.*0.5.*omegap[:,t].*dt) #integration of reation term to match diffusion scheme, uncomment if reaction !=0
+        reaction[1,:] = dt.*(p_params.reaction_form[1].(phip[1,:,1],phip[2,:,1]))#.*exp.(c_phi.*T(0.5).*omegap[:,t].*dt) #integration of reation term to match diffusion scheme, uncomment if reaction !=0
         reaction[2,:] = dt.*(p_params.reaction_form[2].(phip[1,:,1],phip[2,:,1]))
         dphi .+= reaction
         phip[:,:,1+1] = phip[:,:,1]+dphi
@@ -1730,7 +1730,7 @@ end
 function make_f_phi_no_PSP!(f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2}, turb_k_e::T, bc_interact::BitArray{3}, initial_condition::Union{String,Tuple{String,Vararg}}, psi_mesh::PsiGrid{T}, space_cells::CellGrid{T}, bc_params::BCParams{T}, verbose::Bool=false) where T<:AbstractFloat
     np, nt = size(x_pos)
     nt-=1
-    precomp_P = min.(bc_params.bc_k*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e)),1)
+    precomp_P = min.(bc_params.bc_k*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+T(0.5)*bc_params.omega_bar*bc_params.C_0*turb_k_e)),1)
 
     phip = zeros(T, (2, np, nt+1)) #scalar concentration at these points
 
