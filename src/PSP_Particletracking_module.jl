@@ -161,15 +161,15 @@ function PSP_params(omega_bar::T, omega_sigma_2::T,omega_min::T, c_phi::T, c_t::
     return PSPParams(omega_bar, omega_sigma_2, omega_min, omega_t, omega_dist, c_phi, c_t, react_func)
 end
 
-function motion_params(omega_bar::T,C_0::T, B_format::String, u_mean::T2) where T<:AbstractFloat where T2<:Union{AbstractFloat,Tuple{Function,Function}}
+function motion_params(omega_bar::T,C_0::T, B_format::String, u_mean::T2, D_mol::T) where T<:AbstractFloat where T2<:Union{AbstractFloat,Tuple{Function,Function}}
     if B_format == "Decay"
-        return MotionParams(omega_bar, C_0, (1+T(1.5)*C_0), u_mean)
+        return MotionParams(omega_bar, C_0, (1+T(1.5)*C_0), u_mean, D_mol)
     elseif B_format == "Constant"
-        return MotionParams(omega_bar, C_0, (T(1.5)*C_0), u_mean)
+        return MotionParams(omega_bar, C_0, (T(1.5)*C_0), u_mean, D_mol)
     end
 end
 
-function BC_params(bc_k::T, C_0::T, B_format::String, num_vp::Tvp; corr_func::T_corr=nothing, reacting_boundaries::AbstractArray{String}=["lower"]) where T<:AbstractFloat where Tvp<:Int where T_corr<:Union{Nothing, Function, Tuple{Function,Function}}
+function BC_params(bc_k::T, C_0::T, B_format::String, num_vp::Tvp, omega_bar::T, D_mol::T; corr_func::T_corr=nothing, reacting_boundaries::AbstractArray{String}=["lower"]) where T<:AbstractFloat where Tvp<:Int where T_corr<:Union{Nothing, Function, Tuple{Function,Function}}
     if num_vp==1
         binary=true
     else
@@ -180,9 +180,9 @@ function BC_params(bc_k::T, C_0::T, B_format::String, num_vp::Tvp; corr_func::T_
     any(.!in.(reacting_boundaries,[boundary_names])) && @warn "invalid boundary names:" *join(reacting_boundaries[.!in.(reacting_boundaries,[boundary_names])] , ", ")*"\ncontinuing using valid boundaries"
     reacting_boundaries_ind = in.(boundary_names,[reacting_boundaries])
     if B_format == "Decay"
-        return BCParams{T,Tvp,T_corr,binary}(bc_k, C_0, (1+T(1.5)*C_0),num_vp,corr_func,reacting_boundaries_ind)
+        return BCParams{T,Tvp,T_corr,binary}(bc_k, C_0, (1+T(1.5)*C_0),num_vp,corr_func,reacting_boundaries_ind,omega_bar, D_mol)
     elseif B_format == "Constant"
-        return BCParams{T,Tvp,T_corr,binary}(bc_k, C_0, (T(1.5)*C_0),num_vp,corr_func,reacting_boundaries_ind)
+        return BCParams{T,Tvp,T_corr,binary}(bc_k, C_0, (T(1.5)*C_0),num_vp,corr_func,reacting_boundaries_ind,omega_bar, D_mol)
     end
 end
 
@@ -195,7 +195,7 @@ function BC_params(bc_k::T, C_0::T, B_format::String, num_vp::Tvp, omega_bar::T,
     if B_format == "Decay"
         return BCParams{T,Tvp,T_corr,false}(bc_k, C_0, (1+T(1.5)*C_0),num_vp,corr_func,reacting_boundaries_ind, omega_bar, D_mol)
     elseif B_format == "Constant"
-        return BCParams{T,Tvp,T_corr,false}(bc_k, C_0, (T(1.5)*C_0),num_vp,corr_func,reacting_boundaries_ind, omega_bar::T, D_mol)
+        return BCParams{T,Tvp,T_corr,false}(bc_k, C_0, (T(1.5)*C_0),num_vp,corr_func,reacting_boundaries_ind, omega_bar, D_mol)
     end
 end
 
