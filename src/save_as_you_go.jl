@@ -11,8 +11,8 @@ function particle_motion_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractAr
     bc_interact = falses(np, 4)#index is for: upper, lower, right, left
     #intitial vaules of velocity, maintaining consitancy with energy
     ux_f=ux.-m_params.u_mean #find fluctuating velocity
-    ux[:]= ux_f+(-T(0.5)*B*omega_bar*ux_f)*dt.+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
-    uy[:]= uy+(-T(0.5)*B*omega_bar*uy)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
+    ux[:]= ux_f+(-T(0.5)*B*omega_bar*ux_f)*dt.+randn(T, np).*sqrt.((C_0*turb_k_e*omega_bar+2*m_params.D_mol)*dt); 
+    uy[:]= uy+(-T(0.5)*B*omega_bar*uy)*dt+randn(T, np).*sqrt.((C_0*turb_k_e*omega_bar+2*m_params.D_mol)*dt); 
     ux[:].+= m_params.u_mean
     x_pos[:]= x_pos + ux*dt # random walk in x-direction
     y_pos[:]= y_pos + uy*dt # random walk in y-direction
@@ -76,8 +76,8 @@ function particle_motion_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractAr
     bc_interact = falses(np, 4)#index is for: upper, lower, right, left
     #intitial vaules of velocity, maintaining consitancy with energy
 
-    ux[:]= ux+T(0.5)*B*omega_bar*(ux_mean.(x_pos,y_pos)-ux)*dt.+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
-    uy[:]= uy+T(0.5)*B*omega_bar*(uy_mean.(x_pos,y_pos)-uy)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt);
+    ux[:]= ux+T(0.5)*B*omega_bar*(ux_mean.(x_pos,y_pos)-ux)*dt.+randn(T, np).*sqrt.((C_0*turb_k_e*omega_bar+2*m_params.D_mol)*dt); 
+    uy[:]= uy+T(0.5)*B*omega_bar*(uy_mean.(x_pos,y_pos)-uy)*dt+randn(T, np).*sqrt.((C_0*turb_k_e*omega_bar+2*m_params.D_mol)*dt); 
     x_pos[:]= x_pos + ux*dt # random walk in x-direction
     y_pos[:]= y_pos + uy*dt # random walk in y-direction
 
@@ -268,7 +268,7 @@ function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Inte
         @warn "setting chunk_length to multiple of saveing_rates:" chunk_length = rate_lcm*ceil(Int,chunk_length)
     end
     n_chunks=floor(Int, nt/chunk_length)
-    precomp_P = min.(bc_params.bc_k.*sqrt.(2*bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
+    precomp_P = min.(bc_params.bc_k*sqrt.(bc_params.B*pi*m_params.omega_bar/(m_params.D_mol+0.5*m_params.omega_bar*bc_params.C_0*turb_k_e)),1)
     
 
     x_pos = zeros(T, np)
@@ -383,7 +383,7 @@ function no_psp_motion_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T
     x_pos = space_cells.length_domain.*rand(T, np)
     y_pos = space_cells.height_domain.*rand(T, np)
 
-    precomp_P = min.(bc_params.bc_k.*sqrt.(2*bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
+    precomp_P = min.(bc_params.bc_k*sqrt.(bc_params.B*pi*m_params.omega_bar/(m_params.D_mol+0.5*m_params.omega_bar*bc_params.C_0*turb_k_e)),1)
     
     phip = zeros(T, (2, np,1)) #scalar concentration at these points
 

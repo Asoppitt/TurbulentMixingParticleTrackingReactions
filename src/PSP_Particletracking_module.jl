@@ -121,6 +121,7 @@ struct MotionParams{T<:AbstractFloat,T2<:Union{AbstractFloat,Tuple{Function,Func
     C_0::T
     B::T
     u_mean::T2
+    D_mol::T #molecular diffusion
 end
 
 struct BCParams{T<:AbstractFloat, Tvp<:Real, T_corr<:Union{Nothing, Function, Tuple{Function,Function}}, binary}
@@ -130,6 +131,8 @@ struct BCParams{T<:AbstractFloat, Tvp<:Real, T_corr<:Union{Nothing, Function, Tu
     num_vp::Tvp
     corr_factor::T_corr
     reacting_boundaries::AbstractArray{Bool}#which boundary(ies) react
+    omega_bar::T
+    D_mol::T #molecular diffusion
 end
 
 function Omega(dist::D,np::I,p_params::PSPParams{T}) where I<:Integer where D<:Gamma where T<:AbstractFloat
@@ -183,21 +186,21 @@ function BC_params(bc_k::T, C_0::T, B_format::String, num_vp::Tvp; corr_func::T_
     end
 end
 
-function BC_params(bc_k::T, C_0::T, B_format::String, num_vp::Tvp; corr_func::T_corr=nothing, reacting_boundaries::AbstractArray{String}=["lower"]) where T<:AbstractFloat where Tvp<:AbstractFloat where T_corr<:Union{Nothing, Function}
+function BC_params(bc_k::T, C_0::T, B_format::String, num_vp::Tvp, omega_bar::T, D_mol::T; corr_func::T_corr=nothing, reacting_boundaries::AbstractArray{String}=["lower"]) where T<:AbstractFloat where Tvp<:AbstractFloat where T_corr<:Union{Nothing, Function}
     boundary_names=["upper", "lower", "right", "left"]
     reacting_boundaries=lowercase.(reacting_boundaries)
     any(.!in.(reacting_boundaries,[boundary_names])) && @warn "invalid boundary names:" *join(reacting_boundaries[.!in.(reacting_boundaries,[boundary_names])] , ", ")*"\ncontinuing using valid boundaries"
     reacting_boundaries_ind = in.(boundary_names,[reacting_boundaries])
     num_vp == Inf || throw(DomainError("nvpart_per_part must be Int or Inf"))
     if B_format == "Decay"
-        return BCParams{T,Tvp,T_corr,false}(bc_k, C_0, (1+T(1.5)*C_0),num_vp,corr_func,reacting_boundaries_ind)
+        return BCParams{T,Tvp,T_corr,false}(bc_k, C_0, (1+T(1.5)*C_0),num_vp,corr_func,reacting_boundaries_ind, omega_bar, D_mol)
     elseif B_format == "Constant"
-        return BCParams{T,Tvp,T_corr,false}(bc_k, C_0, (T(1.5)*C_0),num_vp,corr_func,reacting_boundaries_ind)
+        return BCParams{T,Tvp,T_corr,false}(bc_k, C_0, (T(1.5)*C_0),num_vp,corr_func,reacting_boundaries_ind, omega_bar::T, D_mol)
     end
 end
 
-function PSP_motion_bc_params(omega_bar::T, omega_sigma_2::T,omega_min::T, C_0::T, B_format::String, c_phi::T, c_t::T,u_mean::T2,bc_k::T,num_vp::Real; corr_func::T_corr=nothing, bulk_reaction=((x,y)->0,(x,y)->0), reacting_boundaries::AbstractArray{String}=["lower"], omega_dist=:Gamma::Symbol, omega_t=1/omega_bar) where T<:AbstractFloat where T_corr<:Union{Nothing, Function}  where T2<:Union{AbstractFloat,Tuple{Function,Function}}
-    return PSP_params(omega_bar, omega_sigma_2,omega_min, c_phi, c_t, bulk_reaction, omega_dist,omega_t=omega_t), motion_params(omega_bar,C_0, B_format, u_mean), BC_params(bc_k, C_0, B_format, num_vp, corr_func=corr_func,reacting_boundaries=reacting_boundaries)
+function PSP_motion_bc_params(omega_bar::T, omega_sigma_2::T,omega_min::T, C_0::T, B_format::String, c_phi::T, c_t::T,u_mean::T2,bc_k::T,num_vp::Real, D_mol::T; corr_func::T_corr=nothing, bulk_reaction=((x,y)->0,(x,y)->0), reacting_boundaries::AbstractArray{String}=["lower"], omega_dist=:Gamma::Symbol, omega_t=1/omega_bar) where T<:AbstractFloat where T_corr<:Union{Nothing, Function}  where T2<:Union{AbstractFloat,Tuple{Function,Function}}
+    return PSP_params(omega_bar, omega_sigma_2,omega_min, c_phi, c_t, bulk_reaction, omega_dist,omega_t=omega_t), motion_params(omega_bar,C_0, B_format, u_mean), BC_params(bc_k, C_0, B_format, num_vp, omega_bar, D_mol,corr_func=corr_func,reacting_boundaries=reacting_boundaries)
 end
 
 function assign_pm!(phi_pm::Matrix{Int}, phi_array_t::Array{T}, particles::Vector{Int}, cell_points::Vector{Int}) where T<:AbstractFloat
@@ -795,8 +798,8 @@ function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, turb_k_e::Vect
     effective_v_particles =( phip[:,abs_points,t_index].*bc_params.num_vp)
     #K for Erban and Chapman approximation 
     P = zeros(TF, 2,n_abs)
-    P[1,:] = min.(abs_k[1,:].*sqrt.(2*bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
-    P[2,:] = min.(abs_k[2,:].*sqrt.(2*bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
+    P[1,:] = min.(abs_k[1,:].*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e),1)
+    P[2,:] = min.(abs_k[2,:].*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e),1)
     #by CLT approx dist for number of virtual particles to have reacted
     xi = randn(TF, 2,n_abs).*sqrt.((P.*(1 .-P)))
     #catching places where all mass has been removed
@@ -873,8 +876,8 @@ function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, turb_k_e::Vect
     abs_k = bc_params.bc_k.*ones(2,n_abs)
     #K for Erban and Chapman approximation 
     P = zeros(TF,2,n_abs)
-    P[1,:] = min.(abs_k[1,:].*sqrt.(2*bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
-    P[2,:] = min.(abs_k[2,:].*sqrt.(2*bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
+    P[1,:] = min.(abs_k[1,:].*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e),1)
+    P[2,:] = min.(abs_k[2,:].*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e),1)
     ratios = 1 .-P #taking mean for limiting case
     phip[:, abs_points, t_index] = phip[:, abs_points, t_index].*ratios
     return nothing
@@ -1277,7 +1280,7 @@ function PSP_model!(f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2}, turb_
     c_t = p_params.c_t
     np, nt = size(x_pos)
     nt-=1
-    precomp_P = min.(bc_params.bc_k.*sqrt.(2*bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
+    precomp_P = min.(bc_params.bc_k*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e)),1)
 
     phip = zeros(T, (2, np, 2)) #scalar concentration at these points
     phi_pm = zeros(Int, 2, np) #pm pairs for each particle
@@ -1407,7 +1410,7 @@ function PSP_model_record_phi_local_diff!(gphi::AbstractArray{T,3},f_phi::Abstra
     c_t = p_params.c_t
     np, nt = size(x_pos)
     nt-=1
-    precomp_P = min.(bc_params.bc_k.*sqrt.(2*bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
+    precomp_P = min.(bc_params.bc_k*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e)),1)
 
     phip = zeros(T, (2, np, 2)) #scalar concentration at these points, 2 is at t+1, 1 is at t
     phi_pm = zeros(Int, 2, np) #pm pairs for each particle
@@ -1553,7 +1556,7 @@ function PSP_model_record_reacting_mass!(edge_mean::AbstractArray{T,1}, edge_squ
     c_t = p_params.c_t
     np, nt = size(x_pos)
     nt-=1
-    precomp_P = min.(bc_params.bc_k.*sqrt.(2*bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
+    precomp_P = min.(bc_params.bc_k*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e)),1)
 
     phip = zeros(T, (2, np, 1+1)) #scalar concentration at these points
     phi_pm = zeros(Int, 2, np) #pm pairs for each particle
@@ -1723,11 +1726,11 @@ function make_f_phi_no_PSP!(f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2
     return nothing
 end
 
-#constant turb_k_e TODO:integrate with rewritten api 
+#constant turb_k_e 
 function make_f_phi_no_PSP!(f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2}, turb_k_e::T, bc_interact::BitArray{3}, initial_condition::Union{String,Tuple{String,Vararg}}, psi_mesh::PsiGrid{T}, space_cells::CellGrid{T}, bc_params::BCParams{T}, verbose::Bool=false) where T<:AbstractFloat
     np, nt = size(x_pos)
     nt-=1
-    precomp_P = min.(bc_params.bc_k.*sqrt.(2*bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
+    precomp_P = min.(bc_params.bc_k*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e)),1)
 
     phip = zeros(T, (2, np, nt+1)) #scalar concentration at these points
 
