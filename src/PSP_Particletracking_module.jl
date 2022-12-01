@@ -200,7 +200,7 @@ function BC_params(bc_k::T, C_0::T, B_format::String, num_vp::Tvp, omega_bar::T,
 end
 
 function PSP_motion_bc_params(omega_bar::T, omega_sigma_2::T,omega_min::T, C_0::T, B_format::String, c_phi::T, c_t::T,u_mean::T2,bc_k::T,num_vp::Real, D_mol::T; corr_func::T_corr=nothing, bulk_reaction=((x,y)->0,(x,y)->0), reacting_boundaries::AbstractArray{String}=["lower"], omega_dist=:Gamma::Symbol, omega_t=1/omega_bar) where T<:AbstractFloat where T_corr<:Union{Nothing, Function}  where T2<:Union{AbstractFloat,Tuple{Function,Function}}
-    return PSP_params(omega_bar, omega_sigma_2,omega_min, c_phi, c_t, bulk_reaction, omega_dist,omega_t=omega_t), motion_params(omega_bar,C_0, B_format, u_mean), BC_params(bc_k, C_0, B_format, num_vp, omega_bar, D_mol,corr_func=corr_func,reacting_boundaries=reacting_boundaries)
+    return PSP_params(omega_bar, omega_sigma_2,omega_min, c_phi, c_t, bulk_reaction, omega_dist,omega_t=omega_t), motion_params(omega_bar,C_0, B_format, u_mean, D_mol), BC_params(bc_k, C_0, B_format, num_vp, omega_bar, D_mol,corr_func=corr_func,reacting_boundaries=reacting_boundaries)
 end
 
 function assign_pm!(phi_pm::Matrix{Int}, phi_array_t::Array{T}, particles::Vector{Int}, cell_points::Vector{Int}) where T<:AbstractFloat
