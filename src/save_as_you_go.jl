@@ -140,7 +140,7 @@ end
 function omega_step!(omegap::Omega{T,LogNormal},dt::T) where T<:AbstractFloat
     #E-M solver for LogNormal
     dw = sqrt(dt).*randn(T,size(omegap,1)) #random draws
-    omegap.log_omega[:] .+=  -(omegap.inv_T_omega).*(omegap.log_omega.+TF(0.5)*omegap.log_sigma_2).*dt.+sqrt.(2*omegap.inv_T_omega*omegap.log_sigma_2).*dw
+    omegap.log_omega[:] .+=  -(omegap.inv_T_omega).*(omegap.log_omega.+T(0.5)*omegap.log_sigma_2).*dt.+sqrt.(2*omegap.inv_T_omega*omegap.log_sigma_2).*dw
 
     omegap[:] = exp.(omegap.log_omega.+omegap.log_omega_bar)
 
