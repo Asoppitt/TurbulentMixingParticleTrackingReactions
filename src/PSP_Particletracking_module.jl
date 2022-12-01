@@ -798,8 +798,8 @@ function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, turb_k_e::Vect
     effective_v_particles =( phip[:,abs_points,t_index].*bc_params.num_vp)
     #K for Erban and Chapman approximation 
     P = zeros(TF, 2,n_abs)
-    P[1,:] = min.(abs_k[1,:].*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e),1)
-    P[2,:] = min.(abs_k[2,:].*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e),1)
+    P[1,:] = min.(abs_k[1,:].*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e),1))
+    P[2,:] = min.(abs_k[2,:].*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e),1))
     #by CLT approx dist for number of virtual particles to have reacted
     xi = randn(TF, 2,n_abs).*sqrt.((P.*(1 .-P)))
     #catching places where all mass has been removed
@@ -876,8 +876,8 @@ function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, turb_k_e::Vect
     abs_k = bc_params.bc_k.*ones(2,n_abs)
     #K for Erban and Chapman approximation 
     P = zeros(TF,2,n_abs)
-    P[1,:] = min.(abs_k[1,:].*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e),1)
-    P[2,:] = min.(abs_k[2,:].*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e),1)
+    P[1,:] = min.(abs_k[1,:].*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e),1))
+    P[2,:] = min.(abs_k[2,:].*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+0.5*bc_params.omega_bar*bc_params.C_0*turb_k_e),1))
     ratios = 1 .-P #taking mean for limiting case
     phip[:, abs_points, t_index] = phip[:, abs_points, t_index].*ratios
     return nothing
