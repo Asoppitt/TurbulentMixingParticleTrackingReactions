@@ -326,7 +326,7 @@ function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Inte
                 (mom_2[1,ceil(Int,i/saveing_rate_moments)] = mean(phip[1,:].^2))
                 (mom_2[2,ceil(Int,i/saveing_rate_moments)] = mean(phip[2,:].^2,))
             end
-            verbose && print(t,' ')
+            #verbose && print(t,' ')
         end
         write(foldername*'/'*string(chunk*chunk_length+1)*'_'*string((chunk+1)*chunk_length)*"data",f_phi)
         write(foldername*'/'*string(chunk*chunk_length+1)*'_'*string((chunk+1)*chunk_length)*"array_shape",[i for i in size(f_phi)])
@@ -357,7 +357,7 @@ function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Inte
                 (mom_2[1,ceil(Int,i/saveing_rate_moments)] = mean(phip[1,:].^2))
                 (mom_2[2,ceil(Int,i/saveing_rate_moments)] = mean(phip[2,:].^2))
             end
-            verbose && print(t,' ')
+            #verbose && print(t,' ')
         end
         write(foldername*'/'*string(chunk_length*(n_chunks)+1)*'_'*string(nt)*"data",f_phi)
         write(foldername*'/'*string(chunk_length*(n_chunks)+1)*'_'*string(nt)*"array_shape",[i for i in size(f_phi)])
