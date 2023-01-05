@@ -935,6 +935,8 @@ function particle_motion_model(x_pos::Array{T,2},y_pos::Array{T,2}, turb_k_e::Ar
     uxp = randn(T, np).*sqrt.(2/3 .*turb_k_e[:,1])
     uyp = randn(T, np).*sqrt.(2/3 .*turb_k_e[:,1])
     for t=1:nt
+        x_pos[:,t+1] = x_pos[:,t] + (uxp_full)*dt # random walk in x-direction
+        y_pos[:,t+1] = y_pos[:,t] + uyp*dt # random walk in y-direction
         uxp = uxp+(-T(0.5)*B*omega_bar*uxp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e[:,t].*omega_bar.*dt); 
         uyp = uyp+(-T(0.5)*B*omega_bar*uyp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e[:,t].*omega_bar.*dt); 
         for i in 1:space_cells.y_res
@@ -946,8 +948,6 @@ function particle_motion_model(x_pos::Array{T,2},y_pos::Array{T,2}, turb_k_e::Ar
             end
         end
         uxp_full = u_mean .+ uxp
-        x_pos[:,t+1] = x_pos[:,t] + (uxp_full)*dt # random walk in x-direction
-        y_pos[:,t+1] = y_pos[:,t] + uyp*dt # random walk in y-direction
 
             # Reflection particles at boundaries
 
@@ -1011,11 +1011,11 @@ function particle_motion_model(x_pos::Array{T,2},y_pos::Array{T,2}, turb_k_e::T,
     uxp = randn(T, np).*sqrt.(2/3 .*turb_k_e)
     uyp = randn(T, np).*sqrt.(2/3 .*turb_k_e)
     for t=1:nt
+        x_pos[:,t+1] = x_pos[:,t] + (uxp_full)*dt # random walk in x-direction
+        y_pos[:,t+1] = y_pos[:,t] + uyp*dt # random walk in y-direction
         uxp = uxp+(-T(0.5)*B*omega_bar*uxp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
         uyp = uyp+(-T(0.5)*B*omega_bar*uyp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
         uxp_full = u_mean .+ uxp
-        x_pos[:,t+1] = x_pos[:,t] + (uxp_full)*dt # random walk in x-direction
-        y_pos[:,t+1] = y_pos[:,t] + uyp*dt # random walk in y-direction
 
             # Reflection particles at boundaries
 
@@ -1080,11 +1080,11 @@ function particle_motion_model_ref_start(x_pos::Array{T,2},y_pos::Array{T,2}, tu
     uxp = randn(T, np).*sqrt.(2/3 .*turb_k_e)
     uyp = randn(T, np).*sqrt.(2/3 .*turb_k_e)
     for t=1:nt
-        uxp = uxp+(-T(0.5)*B*omega_bar*uxp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
-        uyp = uyp+(-T(0.5)*B*omega_bar*uyp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
         uxp_full = u_mean .+ uxp
         x_pos[:,t+1] = x_pos[:,t] + (uxp_full)*dt # random walk in x-direction
         y_pos[:,t+1] = y_pos[:,t] + uyp*dt # random walk in y-direction
+        uxp = uxp+(-T(0.5)*B*omega_bar*uxp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
+        uyp = uyp+(-T(0.5)*B*omega_bar*uyp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
 
             # Reflection particles at boundaries
 
