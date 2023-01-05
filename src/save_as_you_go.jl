@@ -422,7 +422,7 @@ function no_psp_motion_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T
         verbose && println('\n',"saved steps: "*string(chunk*chunk_length+1)*" to "*string((chunk+1)*chunk_length))
     end
     if (n_chunks)*chunk_length < nt
-        f_phi=zeros(T,psi_mesh.psi_partions_num_1, psi_mesh.psi_partions_num_2, space_cells.y_res, space_cells.x_res, ceil(Int(nt-(n_chunks)*chunk_length)/saving_rate ))
+        f_phi=zeros(T,psi_mesh.psi_partions_num_1, psi_mesh.psi_partions_num_2, space_cells.y_res, space_cells.x_res, ceil(Int,(nt-(n_chunks)*chunk_length)/saving_rate ))
         if record_moments
             means=zeros(T,2,ceil(Int,(nt-(n_chunks)*chunk_length)/saving_rate_moments))
             mom_2=zeros(T,2,ceil(Int,(nt-(n_chunks)*chunk_length)/saving_rate_moments))
