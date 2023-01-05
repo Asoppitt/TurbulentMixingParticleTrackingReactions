@@ -318,7 +318,6 @@ function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Inte
             if t%saveing_rate==0
                 for (ind, cell_parts) in pairs(celli)#pariticle-cell pairs are already defined, so use them for f_phi
                     assign_f_phi_cell!(f_phi,phip[:,cell_parts], psi_mesh, ind[1],ind[2],ceil(Int,i/saveing_rate))
-                    println(ceil(Int,i/saveing_rate))
                 end
             end
             if record_moments && t%saveing_rate_moments==0
@@ -404,7 +403,7 @@ function no_psp_motion_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T
             bc_absorbtion!(phip,any(bc_interact[:,bc_params.reacting_boundaries], dims=2)[:,1],bc_params,1, precomp_P) #reactive bc is chosen by bc_params.reacting_boundaries
             t%saveing_rate==0&&(eval_by_cell!((ind_1,ind_2,cell_particles)-> (
                 assign_f_phi_cell!(f_phi,phip[:,cell_particles], psi_mesh, ind_1,ind_2,ceil(Int,i/saveing_rate));
-            return nothing) , x_pos, y_pos, space_cells); println(ceil(Int,i/saveing_rate)))
+            return nothing) , x_pos, y_pos, space_cells))
             if record_moments && t%saveing_rate_moments==0 
                 (means[1,ceil(Int,i/saveing_rate_moments)] = mean(phip[1,:]))
                 (means[2,ceil(Int,i/saveing_rate_moments)] = mean(phip[2,:]))
