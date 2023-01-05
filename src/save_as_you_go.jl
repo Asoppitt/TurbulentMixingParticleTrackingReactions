@@ -335,7 +335,7 @@ function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Inte
             write(foldername*'/'*string(chunk*chunk_length+1)*'_'*string((chunk+1)*chunk_length)*"mean",means)
             write(foldername*'/'*string(chunk*chunk_length+1)*'_'*string((chunk+1)*chunk_length)*"2nd_moment",mom_2)
         end
-        write(foldername*'/'*"total_shape", [chunk+1,floor(Int,chunk_length/saveing_rate),floor(Int,((chunk+1)*chunk_length)),false,record_moments] )
+        write(foldername*'/'*"total_shape", [chunk+1,Int,chunk_length,floor(Int,((chunk+1)*chunk_length)),false,record_moments,saveing_rate] )
         verbose && println('\n',"saved steps: "*string(chunk*chunk_length+1)*" to "*string((chunk+1)*chunk_length))
     end
     if (n_chunks)*chunk_length < nt
@@ -402,9 +402,9 @@ function no_psp_motion_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T
         for (i,t) in enumerate((chunk*chunk_length+1):((chunk+1)*chunk_length))
             bc_interact=particle_motion_model_step!(x_pos,y_pos, ux,uy, turb_k_e, m_params, dt, space_cells, np)
             bc_absorbtion!(phip,any(bc_interact[:,bc_params.reacting_boundaries], dims=2)[:,1],bc_params,1, precomp_P) #reactive bc is chosen by bc_params.reacting_boundaries
-            t%saveing_rate==0&&eval_by_cell!((ind_1,ind_2,cell_particles)-> (
+            t%saveing_rate==0&&(eval_by_cell!((ind_1,ind_2,cell_particles)-> (
                 assign_f_phi_cell!(f_phi,phip[:,cell_particles], psi_mesh, ind_1,ind_2,ceil(Int,i/saveing_rate));
-            return nothing) , x_pos, y_pos, space_cells)
+            return nothing) , x_pos, y_pos, space_cells); println(ceil(Int,i/saveing_rate)))
             if record_moments && t%saveing_rate_moments==0 
                 (means[1,ceil(Int,i/saveing_rate_moments)] = mean(phip[1,:]))
                 (means[2,ceil(Int,i/saveing_rate_moments)] = mean(phip[2,:]))
