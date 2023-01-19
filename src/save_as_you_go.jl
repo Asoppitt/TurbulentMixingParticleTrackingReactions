@@ -365,7 +365,7 @@ function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Inte
             write(foldername*'/'*string(chunk_length*(n_chunks)+1)*'_'*string(nt)*"mean",means)
             write(foldername*'/'*string(chunk_length*(n_chunks)+1)*'_'*string(nt)*"2nd_moment",mom_2)
         end
-        write(foldername*'/'*"total_shape", [(n_chunks+1),chunk_length,floor(Int,nt/saving_rate),true, record_moments,saving_rate] )
+        write(foldername*'/'*"total_shape", [(n_chunks+1),chunk_length,floor(Int,nt),true, record_moments,saving_rate] )
         verbose && println('\n',"saved steps: "*string(chunk_length*(n_chunks+1)+1)*" to "*string(nt))
     end
     verbose && println("end")
