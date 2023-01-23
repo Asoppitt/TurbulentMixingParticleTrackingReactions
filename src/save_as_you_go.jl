@@ -389,6 +389,9 @@ function no_psp_motion_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T
 
     f_phi=zeros(T,psi_mesh.psi_partions_num_1, psi_mesh.psi_partions_num_2, space_cells.y_res, space_cells.x_res, ceil(Int,chunk_length/saving_rate))
 
+    omega0_dist =  make_omega_dist(p_params)#this should now match long term distribution of omega
+    omegap = Omega(omega0_dist,np,p_params)
+
     set_phi_as_ic!(phip,initial_condition,x_pos,y_pos,space_cells,1)
     assign_f_phi!(f_phi,phip, x_pos, y_pos, psi_mesh, space_cells,1)
 
@@ -399,6 +402,7 @@ function no_psp_motion_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T
 
     for chunk=0:n_chunks-1
         for (i,t) in enumerate((chunk*chunk_length+1):((chunk+1)*chunk_length))
+            omega_step!(omegap,dt)
             bc_interact=particle_motion_model_step!(x_pos,y_pos, ux,uy,omegap, turb_k_e, m_params, dt, space_cells, np)
             bc_absorbtion!(phip,any(bc_interact[:,bc_params.reacting_boundaries], dims=2)[:,1],bc_params,1, precomp_P) #reactive bc is chosen by bc_params.reacting_boundaries
             t%saving_rate==0&&(eval_by_cell!((ind_1,ind_2,cell_particles)-> (
@@ -428,6 +432,7 @@ function no_psp_motion_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T
             mom_2=zeros(T,2,ceil(Int,(nt-(n_chunks)*chunk_length)/saving_rate_moments))
         end
         for (i,t) in enumerate(((n_chunks)*chunk_length+1):nt)
+            omega_step!(omegap,dt)
             bc_interact=particle_motion_model_step!(x_pos,y_pos, ux,uy,omegap, turb_k_e, m_params, dt, space_cells, np)
             bc_absorbtion!(phip,any(bc_interact[:,bc_params.reacting_boundaries], dims=2)[:,1],bc_params,1, precomp_P) #reactive bc is chosen by bc_params.reacting_boundaries
             t%saving_rate==0 && eval_by_cell!((ind_1,ind_2,cell_particles)-> (
