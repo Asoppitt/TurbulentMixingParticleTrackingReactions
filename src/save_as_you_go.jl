@@ -13,8 +13,8 @@ function particle_motion_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractAr
     x_pos[:]= x_pos + ux*dt # random walk in x-direction
     y_pos[:]= y_pos + uy*dt # random walk in y-direction
     ux_f=ux.-m_params.u_mean #find fluctuating velocity
-    ux[:]= ux_f+(-T(0.5)*B*omegap.omega*ux_f)*dt.+randn(T, np).*sqrt.(C_0.*turb_k_e.*omegap.omega.*dt); 
-    uy[:]= uy+(-T(0.5)*B*omegap.omega*uy)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omegap.omega.*dt); 
+    ux[:]= ux_f+(-T(0.5)*B.*omegap.omega.*ux_f).*dt.+randn(T, np).*sqrt.(C_0.*turb_k_e.*omegap.omega.*dt); 
+    uy[:]= uy+(-T(0.5).*B.*omegap.omega.*uy)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omegap.omega.*dt); 
     ux[:].+= m_params.u_mean
 
     # Reflection particles at boundaries
