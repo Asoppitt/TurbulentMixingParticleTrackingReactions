@@ -54,7 +54,7 @@ struct OmegaGl{T}<:Omega{T,Gamma}
     inv_T_omega::T
 end
 
-struct OmegaG{T}<:Omega{T,Gamma,Min}
+struct OmegaG{T}<:Omega{T,Gamma,:Min}
     omega::Vector{T}
     dist::Gamma
     omega_bar::T
