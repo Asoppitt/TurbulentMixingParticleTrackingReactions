@@ -41,9 +41,9 @@ struct PSPParams{T<:AbstractFloat}
 end
 
 #structures to hold the data needed for Omega
-abstract type Omega{AbstractFloat,Distribution} end
+abstract type Omega{AbstractFloat,Distribution,Logical} end
 
-struct OmegaGl{T}<:Omega{T,Gamma}
+struct OmegaGl{T}<:Omega{T,Gamma, false}
     omega::Vector{T}
     log_omega::Vector{T}
     dist::Gamma
@@ -54,7 +54,7 @@ struct OmegaGl{T}<:Omega{T,Gamma}
     inv_T_omega::T
 end
 
-struct OmegaG{T}<:Omega{T,Gamma,:Min}
+struct OmegaG{T}<:Omega{T,Gamma,true}
     omega::Vector{T}
     dist::Gamma
     omega_bar::T
@@ -64,7 +64,7 @@ struct OmegaG{T}<:Omega{T,Gamma,:Min}
     inv_T_omega::T
 end
 
-struct OmegaL{T}<:Omega{T,LogNormal}
+struct OmegaL{T}<:Omega{T,LogNormal,false}
     omega::Vector{T}
     log_omega::Vector{T}
     dist::LogNormal
