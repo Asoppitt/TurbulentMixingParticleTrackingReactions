@@ -43,8 +43,20 @@ end
 #structures to hold the data needed for Omega
 abstract type Omega{AbstractFloat,Distribution} end
 
-struct OmegaG{T}<:Omega{T,Gamma}
+struct OmegaGl{T}<:Omega{T,Gamma}
     omega::Vector{T}
+    log_omega::Vector{T}
+    dist::Gamma
+    omega_bar::T
+    omega_sigma_2::T
+    omega_min::T
+    T_omega::T
+    inv_T_omega::T
+end
+
+struct OmegaG{T}<:Omega{T,Gamma,Min}
+    omega::Vector{T}
+    log_omega::Vector{T}
     dist::Gamma
     omega_bar::T
     omega_sigma_2::T
