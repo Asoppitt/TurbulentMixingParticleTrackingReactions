@@ -56,7 +56,6 @@ end
 
 struct OmegaG{T}<:Omega{T,Gamma,Min}
     omega::Vector{T}
-    log_omega::Vector{T}
     dist::Gamma
     omega_bar::T
     omega_sigma_2::T
@@ -146,7 +145,8 @@ end
 
 function Omega(dist::D,np::I,p_params::PSPParams{T}) where I<:Integer where D<:Gamma where T<:AbstractFloat
     omega=T.(rand(dist,np))
-    return OmegaG(omega,dist,p_params.omega_bar,p_params.omega_sigma_2,p_params.omega_min,p_params.T_omega,1/p_params.T_omega)
+    p_params.omega_min>0 && return OmegaG(omega,dist,p_params.omega_bar,p_params.omega_sigma_2,p_params.omega_min,p_params.T_omega,1/p_params.T_omega)
+    p_params.omega_min<=0 &&return OmegaGl(omega,log.(omega),dist,p_params.omega_bar,p_params.omega_sigma_2,p_params.omega_min,p_params.T_omega,1/p_params.T_omega)
 end
 
 function Omega(dist::D,np::I,p_params::PSPParams{T}) where I<:Integer where D<:LogNormal where T<:AbstractFloat
