@@ -129,7 +129,7 @@ function particle_motion_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractAr
     return bc_interact
 end
 
-function omega_step!(omegap::Omega{T,Gamma,Min},dt::T) where T<:AbstractFloat
+function omega_step!(omegap::Omega{T,Gamma,:Min},dt::T) where T<:AbstractFloat
     #E-M solver for omega, in gamma dist
     dw = sqrt(dt).*randn(T, size(omegap,1)) #random draws
     omegap .-= -(omegap.-omegap.omega_bar).*omegap.inv_T_omega.*dt + sqrt.((omegap.-omegap.omega_min).*(2*omegap.omega_sigma_2*omegap.omega_bar*omegap.inv_T_omega)).*dw
