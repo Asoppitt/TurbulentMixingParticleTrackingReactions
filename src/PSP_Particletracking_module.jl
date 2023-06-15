@@ -151,7 +151,7 @@ end
 
 function Omega(dist::D,np::I,p_params::PSPParams{T}) where I<:Integer where D<:LogNormal where T<:AbstractFloat
     omega=T.(rand(dist,np))
-    return OmegaL(omega,log.(omega),dist,p_params.omega_bar,p_params.omega_sigma_2,p_params.omega_min,p_params.T_omega,log(p_params.omega_bar),1/p_params.T_omega,varlogx(dist))
+    return OmegaL(omega,log.(omega),dist,p_params.omega_bar,p_params.omega_sigma_2,p_params.omega_min,p_params.T_omega,log(p_params.omega_bar),varlogx(dist),1/p_params.T_omega)
 end
 
 function cell_grid(x_res ::Int,y_res ::Int,length_domain ::T,height_domain ::T) where T<:AbstractFloat #constructor for CellGrid
