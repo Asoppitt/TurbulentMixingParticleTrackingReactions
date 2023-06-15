@@ -2,7 +2,7 @@ include("PSP_Particletracking_module.jl")
 # module ContinuousSaving
 export no_psp_motion_model!, PSP_model!
 
-function particle_motion_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractArray{T,1}, ux::AbstractArray{T,1},uy::AbstractArray{T,1}, turb_k_e::T, m_params::MotionParams{T,T}, dt::T, space_cells::CellGrid{T},np::Integer) where T<:AbstractFloat
+function particle_motion_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractArray{T,1}, ux::AbstractArray{T,1},uy::AbstractArray{T,1}, omegap::Omega{T}, turb_k_e::T, m_params::MotionParams{T,T}, dt::T, space_cells::CellGrid{T},np::Integer) where T<:AbstractFloat
     "takes x_pos, y_pos, ux, uy and computes the correct velocity/position, stored in index
     Also records the boundary interaction array, as output"
     omega_bar=m_params.omega_bar
@@ -13,8 +13,8 @@ function particle_motion_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractAr
     x_pos[:]= x_pos + ux*dt # random walk in x-direction
     y_pos[:]= y_pos + uy*dt # random walk in y-direction
     ux_f=ux.-m_params.u_mean #find fluctuating velocity
-    ux[:]= ux_f+(-T(0.5)*B*omega_bar*ux_f)*dt.+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
-    uy[:]= uy+(-T(0.5)*B*omega_bar*uy)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
+    ux[:]= ux_f+(-T(0.5)*B.*omegap.omega.*ux_f).*dt.+randn(T, np).*sqrt.(C_0.*turb_k_e.*omegap.omega.*dt); 
+    uy[:]= uy+(-T(0.5).*B.*omegap.omega.*uy)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omegap.omega.*dt); 
     ux[:].+= m_params.u_mean
 
     # Reflection particles at boundaries
@@ -65,7 +65,7 @@ function particle_motion_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractAr
     return bc_interact
 end
 
-function particle_motion_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractArray{T,1}, ux::AbstractArray{T,1},uy::AbstractArray{T,1}, turb_k_e::T, m_params::MotionParams{T,Tuple{F,G}}, dt::T, space_cells::CellGrid{T},np::Integer) where T<:AbstractFloat where F<:Function where G<:Function
+function particle_motion_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractArray{T,1}, ux::AbstractArray{T,1},uy::AbstractArray{T,1}, omegap::Omega{T}, turb_k_e::T, m_params::MotionParams{T,Tuple{F,G}}, dt::T, space_cells::CellGrid{T},np::Integer) where T<:AbstractFloat where F<:Function where G<:Function
     "takes x_pos, y_pos, ux, uy and computes the correct velocity/position, stored in index
     Also records the boundary interaction array, as output"
     omega_bar=m_params.omega_bar
@@ -78,8 +78,8 @@ function particle_motion_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractAr
 
     x_pos[:]= x_pos + ux*dt # random walk in x-direction
     y_pos[:]= y_pos + uy*dt # random walk in y-direction
-    ux[:]= ux+T(0.5)*B*omega_bar*(ux_mean.(x_pos,y_pos)-ux)*dt.+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
-    uy[:]= uy+T(0.5)*B*omega_bar*(uy_mean.(x_pos,y_pos)-uy)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt);
+    ux[:]= ux+T(0.5)*B.*omegap.omega.*(ux_mean.(x_pos,y_pos)-ux)*dt.+randn(T, np).*sqrt.(C_0.*turb_k_e.*omegap.omega.*dt); 
+    uy[:]= uy+T(0.5)*B.*omegap.omega.*(uy_mean.(x_pos,y_pos)-uy)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omegap.omega.*dt);
 
     # Reflection particles at boundaries
 
@@ -313,7 +313,7 @@ function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Inte
 
     for chunk=0:n_chunks-1
         for (i,t) in enumerate((chunk*chunk_length+1):((chunk+1)*chunk_length))
-            bc_interact=particle_motion_model_step!(x_pos,y_pos, ux,uy, turb_k_e, m_params, dt, space_cells, np)
+            bc_interact=particle_motion_model_step!(x_pos,y_pos, ux,uy,omegap, turb_k_e, m_params, dt, space_cells, np)
             PSP_model_step!(x_pos,y_pos,phip,celli,omegap, t_decorr_m, t_decorr_p, phi_pm, bc_interact, dt, p_params,space_cells, bc_params,np,precomp_P)
             if t%saving_rate==0
                 for (ind, cell_parts) in pairs(celli)#pariticle-cell pairs are already defined, so use them for f_phi
@@ -344,7 +344,7 @@ function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Inte
             mom_2=zeros(T,2,ceil(Int,(nt-(n_chunks)*chunk_length)/saving_rate_moments))
         end
         for (i,t) in enumerate(((n_chunks)*chunk_length+1):nt)
-            bc_interact=particle_motion_model_step!(x_pos,y_pos, ux,uy, turb_k_e, m_params, dt, space_cells, np)
+            bc_interact=particle_motion_model_step!(x_pos,y_pos, ux,uy, omegap, turb_k_e, m_params, dt, space_cells, np)
             PSP_model_step!(x_pos,y_pos,phip,celli,omegap,t_decorr_p, t_decorr_m, phi_pm, bc_interact, dt, p_params,space_cells, bc_params,np,precomp_P)
             if t%saving_rate==0
                 for (ind, cell_parts) in pairs(celli)#pariticle-cell pairs are already defined, so use them for f_phi
@@ -389,6 +389,9 @@ function no_psp_motion_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T
 
     f_phi=zeros(T,psi_mesh.psi_partions_num_1, psi_mesh.psi_partions_num_2, space_cells.y_res, space_cells.x_res, ceil(Int,chunk_length/saving_rate))
 
+    omega0_dist =  make_omega_dist(p_params)#this should now match long term distribution of omega
+    omegap = Omega(omega0_dist,np,p_params)
+
     set_phi_as_ic!(phip,initial_condition,x_pos,y_pos,space_cells,1)
     assign_f_phi!(f_phi,phip, x_pos, y_pos, psi_mesh, space_cells,1)
 
@@ -399,7 +402,8 @@ function no_psp_motion_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T
 
     for chunk=0:n_chunks-1
         for (i,t) in enumerate((chunk*chunk_length+1):((chunk+1)*chunk_length))
-            bc_interact=particle_motion_model_step!(x_pos,y_pos, ux,uy, turb_k_e, m_params, dt, space_cells, np)
+            omega_step!(omegap,dt)
+            bc_interact=particle_motion_model_step!(x_pos,y_pos, ux,uy,omegap, turb_k_e, m_params, dt, space_cells, np)
             bc_absorbtion!(phip,any(bc_interact[:,bc_params.reacting_boundaries], dims=2)[:,1],bc_params,1, precomp_P) #reactive bc is chosen by bc_params.reacting_boundaries
             t%saving_rate==0&&(eval_by_cell!((ind_1,ind_2,cell_particles)-> (
                 assign_f_phi_cell!(f_phi,phip[:,cell_particles], psi_mesh, ind_1,ind_2,ceil(Int,i/saving_rate));
@@ -428,7 +432,8 @@ function no_psp_motion_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T
             mom_2=zeros(T,2,ceil(Int,(nt-(n_chunks)*chunk_length)/saving_rate_moments))
         end
         for (i,t) in enumerate(((n_chunks)*chunk_length+1):nt)
-            bc_interact=particle_motion_model_step!(x_pos,y_pos, ux,uy, turb_k_e, m_params, dt, space_cells, np)
+            omega_step!(omegap,dt)
+            bc_interact=particle_motion_model_step!(x_pos,y_pos, ux,uy,omegap, turb_k_e, m_params, dt, space_cells, np)
             bc_absorbtion!(phip,any(bc_interact[:,bc_params.reacting_boundaries], dims=2)[:,1],bc_params,1, precomp_P) #reactive bc is chosen by bc_params.reacting_boundaries
             t%saving_rate==0 && eval_by_cell!((ind_1,ind_2,cell_particles)-> (
                 assign_f_phi_cell!(f_phi,phip[:,cell_particles], psi_mesh, ind_1,ind_2,ceil(Int,i/saving_rate));
