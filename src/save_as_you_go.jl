@@ -9,12 +9,13 @@ function particle_motion_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractAr
     C_0=m_params.C_0
     B=m_params.B
     bc_interact = falses(np, 4)#index is for: upper, lower, right, left
+    println("that one")
     #intitial vaules of velocity, maintaining consitancy with energy
     x_pos[:]= x_pos + ux*dt # random walk in x-direction
     y_pos[:]= y_pos + uy*dt # random walk in y-direction
     ux_f=ux.-m_params.u_mean #find fluctuating velocity
-    ux[:]= ux_f+(-T(0.5)*B.*omegap.omega.*ux_f).*dt.+randn(T, np).*sqrt.(C_0.*turb_k_e.*omegap.omega.*dt); 
-    uy[:]= uy+(-T(0.5).*B.*omegap.omega.*uy)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omegap.omega.*dt); 
+    ux[:]= ux_f.+(-T(0.5)*B.*omegap.omega.*ux_f).*dt.+randn(T, np).*sqrt.(C_0.*turb_k_e.*omegap.omega.*dt); 
+    uy[:]= uy.+(-T(0.5).*B.*omegap.omega.*uy)*dt.+randn(T, np).*sqrt.(C_0.*turb_k_e.*omegap.omega.*dt); 
     ux[:].+= m_params.u_mean
 
     # Reflection particles at boundaries
@@ -75,6 +76,7 @@ function particle_motion_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractAr
     uy_mean=m_params.u_mean[2]
     bc_interact = falses(np, 4)#index is for: upper, lower, right, left
     #intitial vaules of velocity, maintaining consitancy with energy
+    println("this one")
 
     x_pos[:]= x_pos + ux*dt # random walk in x-direction
     y_pos[:]= y_pos + uy*dt # random walk in y-direction
