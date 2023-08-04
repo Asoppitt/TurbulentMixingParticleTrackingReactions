@@ -52,7 +52,7 @@ function PSP_model_no_save_return_moments!(turb_k_e::T, nt::Integer, dt::T, np::
             (vars[1,ceil(Int,i/saving_rate_moments)] = var(phip[1,:]))
             (vars[2,ceil(Int,i/saving_rate_moments)] = var(phip[2,:]))
         end
-        verbose && print(t,' ')
+        verbose && print(i,' ')
     end
 
     return means, vars
