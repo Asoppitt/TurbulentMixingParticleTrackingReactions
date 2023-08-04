@@ -11,8 +11,13 @@ function particle_motion_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractAr
     x_pos[:]= x_pos + ux*dt # random walk in x-direction
     y_pos[:]= y_pos + uy*dt # random walk in y-direction
     ux_f=ux.-m_params.u_mean #find fluctuating velocity
-    ux[:]= ux_f.+(-T(0.5)*B.*omegap.omega_bar.*ux_f).*dt.+randn(T, np).*sqrt.(C_0.*turb_k_e.*omegap.omega_bar.*dt); 
-    uy[:]= uy.+(-T(0.5).*B.*omegap.omega_bar.*uy)*dt.+randn(T, np).*sqrt.(C_0.*turb_k_e.*omegap.omega_bar.*dt); 
+    #an exact solver of O-U, should be more stable for stiff cases/high omega
+    ux[:]= ux_f.*exp(-T(0.5)*B.*omegap.omega_bar*dt).+
+        sqrt.(C_0.*turb_k_e.*omegap.omega_bar)./sqrt(B.*omegap.omega_bar).*
+        sqrt(-expm1(-B.*omegap.omega_bar.*dt)).*randn(T, np)
+    uy[:]= uy.*exp(-T(0.5)*B.*omegap.omega_bar.*dt).+
+        sqrt.(C_0.*turb_k_e.*omegap.omega_bar)./sqrt(B.*omegap.omega_bar).*
+        sqrt(-expm1(-B.*omegap.omega_bar.*dt)).*randn(T, np)
     ux[:].+= m_params.u_mean
 
     # Reflection particles at boundaries
@@ -75,8 +80,15 @@ function particle_motion_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractAr
 
     x_pos[:]= x_pos + ux*dt # random walk in x-direction
     y_pos[:]= y_pos + uy*dt # random walk in y-direction
-    ux[:]= ux+T(0.5)*B.*omegap.omega_bar.*(ux_mean.(x_pos,y_pos)-ux)*dt.+randn(T, np).*sqrt.(C_0.*turb_k_e.*omegap.omega_bar.*dt); 
-    uy[:]= uy+T(0.5)*B.*omegap.omega_bar.*(uy_mean.(x_pos,y_pos)-uy)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omegap.omega_bar.*dt);
+    #an exact solver of O-U, should be more stable
+    ux[:]= ux.*exp(-T(0.5)*B.*omegap.omega_bar*dt).+
+        .-ux_mean.(x_pos,y_pos).*expm1(-T(0.5)*B.*omegap.omega_bar*dt).+
+        sqrt.(C_0.*turb_k_e.*omegap.omega_bar)./sqrt(B.*omegap.omega_bar).*
+        sqrt(-expm1(-B.*omegap.omega_bar.*dt)).*randn(T, np)
+    uy[:]= uy.*exp(-T(0.5)*B.*omegap.omega_bar.*dt).+
+        .-uy_mean.(x_pos,y_pos).*expm1(-T(0.5)*B.*omegap.omega_bar*dt).+
+        sqrt.(C_0.*turb_k_e.*omegap.omega_bar)./sqrt(B.*omegap.omega_bar).*
+        sqrt(-expm1(-B.*omegap.omega_bar.*dt)).*randn(T, np)
 
     # Reflection particles at boundaries
 
