@@ -1,7 +1,7 @@
 name = "TurbulentMixingParticleTrackingReactions"
 uuid = "fed39c7e-7fc2-455e-8207-5e346efe3808"
 authors = ["Alisdair Soppitt"]
-version = "0.3.0"
+version = "0.3.1"
 
 [deps]
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
