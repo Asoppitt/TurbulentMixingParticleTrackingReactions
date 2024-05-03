@@ -1,5 +1,5 @@
-include("PSP_Particletracking_module.jl")
-include("stepwise_funcs.jl")
+# include("PSP_Particletracking_module.jl")
+# include("stepwise_funcs.jl")
 # module ContinuousSaving
 export no_psp_motion_model!, PSP_model!
 
@@ -31,10 +31,7 @@ function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Inte
     phip = zeros(T, (2, np,1)) #scalar concentration at these points
     phi_pm = zeros(Int, 2, np) #pm pairs for each particle
 
-    f_phi=zeros(T,psi_mesh.psi_partions_num_1, psi_mesh.psi_partions_num_2, space_cells.y_res, space_cells.x_res, ceil(Int,chunk_length/saving_rate))
-
-    set_phi_as_ic!(phip,initial_condition,x_pos,y_pos,space_cells,1)
-    assign_f_phi!(f_phi,phip, x_pos, y_pos, psi_mesh, space_cells,1)
+    f_phi=zeros(T,psi_mesh.psi_partions_num_1, psi_mesh.psi_partions_nu^2/sqrt(p_params.omega_bar^2+p_params.omega_sigma_2)
 
     omega0_dist =  make_omega_dist(p_params)#this should now match long term distribution of omega
     omegap = Omega(omega0_dist,np,p_params)

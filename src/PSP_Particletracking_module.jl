@@ -70,7 +70,6 @@ struct OmegaL{T}<:Omega{T,LogNormal,false}
     omega_sigma_2::T
     omega_min::T
     T_omega::T
-    log_omega_bar::T
     log_sigma_2::T
     inv_T_omega::T
 end
@@ -149,7 +148,7 @@ end
 
 function Omega(dist::D,np::I,p_params::PSPParams{T}) where I<:Integer where D<:LogNormal where T<:AbstractFloat
     omega=T.(rand(dist,np))
-    return OmegaL(omega,log.(omega/p_params.omega_bar),dist,p_params.omega_bar,p_params.omega_sigma_2,p_params.omega_min,p_params.T_omega,log(p_params.omega_bar),varlogx(dist),1/p_params.T_omega)
+    return OmegaL(omega,log.(omega/p_params.omega_bar),dist,p_params.omega_bar,p_params.omega_sigma_2,p_params.omega_min,p_params.T_omega,varlogx(dist),1/p_params.T_omega)
 end
 
 function cell_grid(x_res ::Int,y_res ::Int,length_domain ::T,height_domain ::T) where T<:AbstractFloat #constructor for CellGrid

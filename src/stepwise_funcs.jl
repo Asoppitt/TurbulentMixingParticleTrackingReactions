@@ -1,4 +1,4 @@
-include("PSP_Particletracking_module.jl")
+# include("PSP_Particletracking_module.jl")
 
 
 function particle_motion_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractArray{T,1}, ux::AbstractArray{T,1},uy::AbstractArray{T,1}, omegap::Omega{T}, turb_k_e::T, m_params::MotionParams{T,T}, dt::T, space_cells::CellGrid{T},np::Integer) where T<:AbstractFloat
@@ -166,10 +166,11 @@ end
 
 function make_omega_dist(p_params::PSPParams{T}) where T<:AbstractFloat
     if p_params.omega_dist === :Gamma
-        return eval(p_params.omega_dist){T}(T((p_params.omega_bar-p_params.omega_min)^2/(p_params.omega_sigma_2)),
-        T((p_params.omega_sigma_2)/(p_params.omega_bar-p_params.omega_min))) #this should now match long term distribution of omega
+        return eval(p_params.omega_dist){T}(T(1/(p_params.omega_sigma_2)),
+            T(p_params.omega_sigma_2*(p_params.omega_bar-p_params.omega_min))) #this should now match long term distribution of omega
     elseif p_params.omega_dist === :LogNormal
-        return eval(p_params.omega_dist){T}(T((log(p_params.omega_bar^2/sqrt(p_params.omega_bar^2+p_params.omega_sigma_2)))),T(sqrt(log((p_params.omega_bar^2+p_params.omega_sigma_2)/p_params.omega_bar^2)))) #this should now match long term distribution of omega
+        return eval(p_params.omega_dist){T}(T((log(p_params.omega_bar/sqrt(1+p_params.omega_sigma_2)))),
+            T(sqrt(log(1+p_params.omega_sigma_2)))) #this should now match long term distribution of omega
     else
         throw(ArgumentError(p_params.omega_dist))
     end
