@@ -141,8 +141,9 @@ end
 function omega_step!(omegap::Omega{T,Gamma,true},dt::T) where T<:AbstractFloat
     #E-M solver for omega, in gamma dist
     dw = sqrt(dt).*randn(T, size(omegap,1)) #random draws
-    omegap .-= -(omegap.-omegap.omega_bar).*omegap.inv_T_omega.*dt + sqrt.((omegap.-omegap.omega_min).*(2*omegap.omega_sigma_2*omegap.omega_bar*omegap.inv_T_omega)).*dw
-    omegap = omegap.*(omegap.>=omegap.omega_min)+omegap.omega_min.*(omegap.<=omegap.omega_min) #enforcing positivity
+    omegap .+= -(omegap.-omegap.omega_bar).*omegap.inv_T_omega.*dt + sqrt.((omegap.-omegap.omega_min).*(2*omegap.omega_sigma_2*omegap.omega_bar*omegap.inv_T_omega)).*dw
+    # omegap = omegap.*(omegap.>=omegap.omega_min)+omegap.omega_min.*(omegap.<=omegap.omega_min) #enforcing positivity
+    omegap = omegap.*(omegap.>=omegap.omega_min)+(omegap.<=omegap.omega_min).*(abs.(omegap.-omegap.omega_min).+omegap.omega_min) #avoids mass at 0
     return nothing
 end
 
@@ -150,6 +151,7 @@ function omega_step!(omegap::Omega{T,Gamma,false},dt::T) where T<:AbstractFloat
     #E-M solver for omega, in gamma dist
     dw = sqrt(dt).*randn(T, size(omegap,1)) #random draws
     omegap.log_omega_normed .-= -(omegap.+(2*omegap.omega_sigma_2)*omegap.omega_bar).*omegap.inv_T_omega./omegap.*dt + sqrt.((2*omegap.omega_sigma_2*omegap.omega_bar*omegap.inv_T_omega)./omegap).*dw
+    # omegap.log_omega_normed .+= ((1-omegap.omega_sigma_2)*omegap.omega_bar-T(1)).*omegap.inv_T_omega.*dt + sqrt.((2*omegap.omega_sigma_2*omegap.omega_bar*omegap.inv_T_omega)./omegap).*dw
     omegap = exp.(omegap.log_omega_normed)
     return nothing
 end

@@ -391,24 +391,24 @@ function set_phi_as_ic_2l!(phi_array::Array{TF,3},yp::Vector{TF},space_cells::Ce
     phi_array[2,yp.<=TF(0.5)*space_cells.height_domain,t_index] .= 1 #.+ uniform_noise[yp[particles,1].<=TF(0.5)*height_domain].*0.05
     return nothing
 end
-function set_phi_as_ic_2l_one_empty!(phi_array::Array{TF,3},empty_layer::Integer,yp::Vector{TF},space_cells::CellGrid{TF}, t_index::Int) where TF<:AbstractFloat
+function set_phi_as_ic_2l_one_empty!(phi_array::Array{TF,3},empty_layer::Integer, layer_bounds::TF, yp::Vector{TF},space_cells::CellGrid{TF}, t_index::Int) where TF<:AbstractFloat
     #Initial_condition == "1 layer scalar, 1 layer empty"
     nparticles = size(phi_array)[2]
     local noise_term = randn(TF, nparticles)
     # local uniform_noise = rand(nparticles).-TF(0.5)
 
     if empty_layer==0
-        phi_array[2,yp.>TF(0.5)*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.>TF(0.5)*space_cells.height_domain] )
-        phi_array[1,yp.>TF(0.5)*space_cells.height_domain,t_index] .= 1
+        phi_array[2,yp.>layer_bounds*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.>layer_bounds*space_cells.height_domain] )
+        phi_array[1,yp.>layer_bounds*space_cells.height_domain,t_index] .= 1
 
-        phi_array[1,yp.<=TF(0.5)*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.<=TF(0.5)*space_cells.height_domain] )
-        phi_array[2,yp.<=TF(0.5)*space_cells.height_domain,t_index] .= abs.(phi_eps*noise_term[yp.<=TF(0.5)*space_cells.height_domain] )
+        phi_array[1,yp.<=layer_bounds*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.<=layer_bounds*space_cells.height_domain] )
+        phi_array[2,yp.<=layer_bounds*space_cells.height_domain,t_index] .= abs.(phi_eps*noise_term[yp.<=layer_bounds*space_cells.height_domain] )
     elseif empty_layer==1
-        phi_array[2,yp.<=TF(0.5)*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.<=TF(0.5)*space_cells.height_domain] )
-        phi_array[1,yp.<=TF(0.5)*space_cells.height_domain,t_index] .= 1
+        phi_array[2,yp.<=layer_bounds*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.<=layer_bounds*space_cells.height_domain] )
+        phi_array[1,yp.<=layer_bounds*space_cells.height_domain,t_index] .= 1
 
-        phi_array[1,yp.>TF(0.5)*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.>TF(0.5)*space_cells.height_domain] )
-        phi_array[2,yp.>TF(0.5)*space_cells.height_domain,t_index] .= abs.(phi_eps*noise_term[yp.>TF(0.5)*space_cells.height_domain] )
+        phi_array[1,yp.>layer_bounds*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.>layer_bounds*space_cells.height_domain] )
+        phi_array[2,yp.>layer_bounds*space_cells.height_domain,t_index] .= abs.(phi_eps*noise_term[yp.>layer_bounds*space_cells.height_domain] )
     end
     return nothing
 end
@@ -596,7 +596,11 @@ function set_phi_as_ic!(phi_array::Array{TF,3},IC_type::Tuple{String,Vararg},xp:
     elseif IC_type_str == "2 layers difference"
         set_phi_as_ic_2l_diff!(phi_array,IC_type[2],yp,space_cells,t_index)
     elseif IC_type_str == "1 layer transport, 1 layer empty"
-        set_phi_as_ic_2l_one_empty!(phi_array,IC_type[2],yp,space_cells,t_index)
+        if length(IC_type>2)
+            set_phi_as_ic_2l_one_empty!(phi_array,IC_type[2],TF(IC_type[3]),yp,space_cells,t_index)
+        else
+            set_phi_as_ic_2l_one_empty!(phi_array,IC_type[2],TF(0.5),yp,space_cells,t_index)
+        end
     elseif IC_type_str == "1 layer transport, 1 layer empty x"
         set_phi_as_ic_2l_one_empty_x!(phi_array,IC_type[2],xp,space_cells,t_index)
     elseif IC_type_str == "vertical strip"
