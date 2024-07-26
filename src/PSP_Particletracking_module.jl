@@ -6,9 +6,7 @@ import LinearAlgebra as la
 import Statistics as st
 import Base.getindex, Base.setindex!, Base.size, Base.length, Base.iterate, Base.ndims, Base.copyto!
 
-export cell_grid,BC_params,psi_grid,motion_params,PSP_motion_bc_params,
-particle_motion_model, PSP_model!, particle_motion_model_ref_start, PSP_model_record_phi_local_diff!,
-PSP_model_record_reacting_mass!
+export cell_grid,BC_params,psi_grid,motion_params,PSP_motion_bc_params
 
 phi_eps=1e-12
 struct CellGrid{T<:AbstractFloat}
@@ -41,9 +39,20 @@ struct PSPParams{T<:AbstractFloat}
 end
 
 #structures to hold the data needed for Omega
-abstract type Omega{AbstractFloat,Distribution} end
+abstract type Omega{AbstractFloat,Distribution,Logical} end
 
-struct OmegaG{T}<:Omega{T,Gamma}
+struct OmegaGl{T}<:Omega{T,Gamma, false}
+    omega::Vector{T}
+    log_omega_normed::Vector{T}
+    dist::Gamma
+    omega_bar::T
+    omega_sigma_2::T
+    omega_min::T
+    T_omega::T
+    inv_T_omega::T
+end
+
+struct OmegaG{T}<:Omega{T,Gamma,true}
     omega::Vector{T}
     dist::Gamma
     omega_bar::T
@@ -53,15 +62,14 @@ struct OmegaG{T}<:Omega{T,Gamma}
     inv_T_omega::T
 end
 
-struct OmegaL{T}<:Omega{T,LogNormal}
+struct OmegaL{T}<:Omega{T,LogNormal,false}
     omega::Vector{T}
-    log_omega::Vector{T}
+    log_omega_normed::Vector{T}
     dist::LogNormal
     omega_bar::T
     omega_sigma_2::T
     omega_min::T
     T_omega::T
-    log_omega_bar::T
     log_sigma_2::T
     inv_T_omega::T
 end
@@ -134,12 +142,13 @@ end
 
 function Omega(dist::D,np::I,p_params::PSPParams{T}) where I<:Integer where D<:Gamma where T<:AbstractFloat
     omega=T.(rand(dist,np))
-    return OmegaG(omega,dist,p_params.omega_bar,p_params.omega_sigma_2,p_params.omega_min,p_params.T_omega,1/p_params.T_omega)
+    p_params.omega_min>0 && return OmegaG(omega,dist,p_params.omega_bar,p_params.omega_sigma_2,p_params.omega_min,p_params.T_omega,1/p_params.T_omega)
+    p_params.omega_min<=0 &&return OmegaGl(omega,log.(omega),dist,p_params.omega_bar,p_params.omega_sigma_2,p_params.omega_min,p_params.T_omega,1/p_params.T_omega)
 end
 
 function Omega(dist::D,np::I,p_params::PSPParams{T}) where I<:Integer where D<:LogNormal where T<:AbstractFloat
     omega=T.(rand(dist,np))
-    return OmegaL(omega,log.(omega),dist,p_params.omega_bar,p_params.omega_sigma_2,p_params.omega_min,p_params.T_omega,log(p_params.omega_bar),1/p_params.T_omega,varlogx(dist))
+    return OmegaL(omega,log.(omega/p_params.omega_bar),dist,p_params.omega_bar,p_params.omega_sigma_2,p_params.omega_min,p_params.T_omega,varlogx(dist),1/p_params.T_omega)
 end
 
 function cell_grid(x_res ::Int,y_res ::Int,length_domain ::T,height_domain ::T) where T<:AbstractFloat #constructor for CellGrid
@@ -382,24 +391,24 @@ function set_phi_as_ic_2l!(phi_array::Array{TF,3},yp::Vector{TF},space_cells::Ce
     phi_array[2,yp.<=TF(0.5)*space_cells.height_domain,t_index] .= 1 #.+ uniform_noise[yp[particles,1].<=TF(0.5)*height_domain].*0.05
     return nothing
 end
-function set_phi_as_ic_2l_one_empty!(phi_array::Array{TF,3},empty_layer::Integer,yp::Vector{TF},space_cells::CellGrid{TF}, t_index::Int) where TF<:AbstractFloat
+function set_phi_as_ic_2l_one_empty!(phi_array::Array{TF,3},empty_layer::Integer, layer_bounds::TF, yp::Vector{TF},space_cells::CellGrid{TF}, t_index::Int) where TF<:AbstractFloat
     #Initial_condition == "1 layer scalar, 1 layer empty"
     nparticles = size(phi_array)[2]
     local noise_term = randn(TF, nparticles)
     # local uniform_noise = rand(nparticles).-TF(0.5)
 
     if empty_layer==0
-        phi_array[2,yp.>TF(0.5)*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.>TF(0.5)*space_cells.height_domain] )
-        phi_array[1,yp.>TF(0.5)*space_cells.height_domain,t_index] .= 1
+        phi_array[2,yp.>layer_bounds*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.>layer_bounds*space_cells.height_domain] )
+        phi_array[1,yp.>layer_bounds*space_cells.height_domain,t_index] .= 1
 
-        phi_array[1,yp.<=TF(0.5)*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.<=TF(0.5)*space_cells.height_domain] )
-        phi_array[2,yp.<=TF(0.5)*space_cells.height_domain,t_index] .= abs.(phi_eps*noise_term[yp.<=TF(0.5)*space_cells.height_domain] )
+        phi_array[1,yp.<=layer_bounds*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.<=layer_bounds*space_cells.height_domain] )
+        phi_array[2,yp.<=layer_bounds*space_cells.height_domain,t_index] .= abs.(phi_eps*noise_term[yp.<=layer_bounds*space_cells.height_domain] )
     elseif empty_layer==1
-        phi_array[2,yp.<=TF(0.5)*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.<=TF(0.5)*space_cells.height_domain] )
-        phi_array[1,yp.<=TF(0.5)*space_cells.height_domain,t_index] .= 1
+        phi_array[2,yp.<=layer_bounds*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.<=layer_bounds*space_cells.height_domain] )
+        phi_array[1,yp.<=layer_bounds*space_cells.height_domain,t_index] .= 1
 
-        phi_array[1,yp.>TF(0.5)*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.>TF(0.5)*space_cells.height_domain] )
-        phi_array[2,yp.>TF(0.5)*space_cells.height_domain,t_index] .= abs.(phi_eps*noise_term[yp.>TF(0.5)*space_cells.height_domain] )
+        phi_array[1,yp.>layer_bounds*space_cells.height_domain,t_index] = abs.(phi_eps*noise_term[yp.>layer_bounds*space_cells.height_domain] )
+        phi_array[2,yp.>layer_bounds*space_cells.height_domain,t_index] .= abs.(phi_eps*noise_term[yp.>layer_bounds*space_cells.height_domain] )
     end
     return nothing
 end
@@ -587,7 +596,11 @@ function set_phi_as_ic!(phi_array::Array{TF,3},IC_type::Tuple{String,Vararg},xp:
     elseif IC_type_str == "2 layers difference"
         set_phi_as_ic_2l_diff!(phi_array,IC_type[2],yp,space_cells,t_index)
     elseif IC_type_str == "1 layer transport, 1 layer empty"
-        set_phi_as_ic_2l_one_empty!(phi_array,IC_type[2],yp,space_cells,t_index)
+        if length(IC_type>2)
+            set_phi_as_ic_2l_one_empty!(phi_array,IC_type[2],TF(IC_type[3]),yp,space_cells,t_index)
+        else
+            set_phi_as_ic_2l_one_empty!(phi_array,IC_type[2],TF(0.5),yp,space_cells,t_index)
+        end
     elseif IC_type_str == "1 layer transport, 1 layer empty x"
         set_phi_as_ic_2l_one_empty_x!(phi_array,IC_type[2],xp,space_cells,t_index)
     elseif IC_type_str == "vertical strip"
@@ -601,7 +614,6 @@ function set_phi_as_ic!(phi_array::Array{TF,3},IC_type::Tuple{String,Vararg},xp:
     end
     return nothing
 end
-
 
 function assign_f_phi_cell!(f_phi_cell::AbstractArray{TF,5},phi_array::AbstractArray{TF,2}, psi_mesh::PsiGrid{TF}, cell_row::Int, cell_column::Int, t_index::Int) where TF <: AbstractFloat
     "use if cell_points has alreday been determined"
@@ -822,40 +834,6 @@ function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, bc_params::BCP
     return nothing
 end
 
-####Not being updated ####
-#using binomal noise for small numbers of vparticles
-#disabled to allow precomp to work
-# function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, turb_k_e::Vector{TF}, bc_params::BCParams{TF,Int, Nothing,false}, t_index::Int) where TF<:AbstractFloat
-#     n_abs = sum(abs_points)
-#     abs_k = bc_params.bc_k.*ones(TF,2,n_abs)
-#     effective_v_particles =( phip[:,abs_points,t_index].*bc_params.num_vp)
-#     #K for Erban and Chapman approximation 
-#     P = zeros(TF,2,n_abs)
-#     P[1,:] = min.(abs_k[1,:].*sqrt.(bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
-#     P[2,:] = min.(abs_k[2,:].*sqrt.(bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
-#     #Binomal dist for number of virtual particles to have reacted
-#     xi_dist = Binomial.(ceil.(effective_v_particles),1 .-P)
-#     xi = [rand(xi_dist[i,j]) for i in 1:2, j in 1:n_abs]
-#     ratios = [effective_v_particles[i,j]>0 ? xi[i,j]./ceil.(effective_v_particles[i,j]) : 0 for i in 1:2, j in 1:n_abs]
-#     phip[:, abs_points, t_index] = phip[:, abs_points, t_index].*ratios
-#     return nothing
-# end
-
-# #binomal precomp
-# function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, bc_params::BCParams{TF,Int, Nothing,false}, t_index::Int, Precomp_P::TF) where TF<:AbstractFloat
-#     n_abs = sum(abs_points)
-#     effective_v_particles =( phip[:,abs_points,t_index].*bc_params.num_vp)
-#     #K for Erban and Chapman approximation 
-#     P = zeros(TF,2,n_abs)
-#     P .= Precomp_P
-#     #Binomal dist for number of virtual particles to have reacted
-#     xi_dist = Binomial.(ceil.(effective_v_particles),1 .-P)
-#     xi = [rand(xi_dist[i,j]) for i in 1:2, j in 1:n_abs]
-#     ratios = [effective_v_particles[i,j]>0 ? xi[i,j]./ceil.(effective_v_particles[i,j]) : 0 for i in 1:2, j in 1:n_abs]
-#     phip[:, abs_points, t_index] = phip[:, abs_points, t_index].*ratios
-#     return nothing
-# end
-
 #binary Precomp, need to edit this file to enable this, (comment out binomal precomp)
 function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, bc_params::BCParams{TF,Int, Nothing,true}, t_index::Int, Precomp_P::TF) where TF<:AbstractFloat 
     #K for Erban and Chapman approximation 
@@ -922,845 +900,3 @@ function bc_absorbtion!(phip::Array{TF,3}, abs_points::BitVector, bc_params::BCP
 end
 
 ###
-
-function particle_motion_model(x_pos::Array{T,2},y_pos::Array{T,2}, turb_k_e::Array{T,2}, m_params::MotionParams{T}, dt::T, space_cells::CellGrid{T}) where T<:AbstractFloat
-    omega_bar=m_params.omega_bar
-    C_0=m_params.C_0
-    B=m_params.B
-    u_mean=m_params.u_mean
-    np = size(x_pos)[1]
-    nt = size(x_pos)[2]-1
-    bc_interact = falses(np, nt, 4)
-    #intitial vaules of velocity, maintaining consitancy with energy
-    uxp = randn(T, np).*sqrt.(2/3 .*turb_k_e[:,1])
-    uyp = randn(T, np).*sqrt.(2/3 .*turb_k_e[:,1])
-    for t=1:nt
-        x_pos[:,t+1] = x_pos[:,t] + (uxp_full)*dt # random walk in x-direction
-        y_pos[:,t+1] = y_pos[:,t] + uyp*dt # random walk in y-direction
-        uxp = uxp+(-T(0.5)*B*omega_bar*uxp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e[:,t].*omega_bar.*dt); 
-        uyp = uyp+(-T(0.5)*B*omega_bar*uyp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e[:,t].*omega_bar.*dt); 
-        for i in 1:space_cells.y_res
-            in_y = space_cells.y_edges[i].<y_pos[:,t].<space_cells.y_edges[i+1]
-            for j in 1:x_res
-                in_x = space_cells.x_edges[j].<x_pos[:,t].<space_cells.x_edges[j+1]
-                cell_particles = findall(in_x.&in_y)
-                turb_k_e[cell_particles,t+1].=T(0.5)*(st.mean(uxp[cell_particles].^2)+st.mean(uyp[cell_particles].^2))*1.5 #turb_e_init;
-            end
-        end
-        uxp_full = u_mean .+ uxp
-
-            # Reflection particles at boundaries
-
-        # Reflection at upper boundary y>height_domain
-        # doing closed on top open on bottom, as cell detection is open on top,
-        # closed on bottom
-        mag = findall(y_pos[:,t+1].>=space_cells.height_domain) # index of particle with yp>height_domain
-        dim_mag = size(mag) # dimension of array "mag"
-
-        y_mag_succ = y_pos[mag,t+1] # yp at time t+1 corresponding to the index "mag"
-
-        V1 = space_cells.height_domain.*ones(T, dim_mag) 
-
-        ypr_mag = V1*2 .- y_mag_succ  # yp at time t+1 of the reflected particle
-
-        y_pos[mag,t+1]= ypr_mag #replacement of yp>1 with yp of reflected particle
-        uyp[mag] = -uyp[mag] #reflecting velocity
-        bc_interact[mag,t,1] .= true
-
-        # Reflection at lower boundary y<0
-        mag = findall(y_pos[:,t+1].<=0) # index of particle with yp>height_domain
-        dim_mag = size(mag) # dimension of array "mag"
-
-        y_mag_succ = y_pos[mag,t+1] # yp at time t+1 corresponding to the index "mag"
-
-        ypr_mag = - y_mag_succ  # yp at time t+1 of the reflected particle
-
-        y_pos[mag,t+1]= ypr_mag #replacement of yp>1 with yp of reflected particle
-        uyp[mag] = -uyp[mag] #reflecting velocity
-        bc_interact[mag,t,2] .= true
-
-        #bc at end (y=length_domain) of domain
-        end_indicies = x_pos[:,t+1].>=space_cells.length_domain #index of particle with xp>length
-
-        end_x = x_pos[end_indicies,t+1]
-        xpr_end = end_x .- space_cells.length_domain #shifting particles back to begining
-        x_pos[end_indicies,t+1] = xpr_end #replacing x coords
-
-        bc_interact[end_indicies,t,3] .= true
-
-        #bc at start (x=0) of domain
-        start_indicies = x_pos[:,t+1].<=0 #index of particle with xp>length
-
-        xpr_start = space_cells.length_domain .+ x_pos[start_indicies,t+1] 
-        x_pos[start_indicies,t+1] = xpr_start #replacing x coords
-        bc_interact[start_indicies,t,4] .= true
-    end
-    return bc_interact
-end
-
-function particle_motion_model(x_pos::Array{T,2},y_pos::Array{T,2}, turb_k_e::T, m_params::MotionParams{T}, dt::T, space_cells::CellGrid{T}) where T<:AbstractFloat
-    #for constant kinetic energy
-    omega_bar=m_params.omega_bar
-    C_0=m_params.C_0
-    B=m_params.B
-    u_mean=m_params.u_mean
-    np = size(x_pos)[1]
-    nt = size(x_pos)[2]-1
-    bc_interact = falses(np, nt, 4)#3rd index is for: upper, lower, right, left
-    #intitial vaules of velocity, maintaining consitancy with energy
-    uxp = randn(T, np).*sqrt.(2/3 .*turb_k_e)
-    uyp = randn(T, np).*sqrt.(2/3 .*turb_k_e)
-    for t=1:nt
-        x_pos[:,t+1] = x_pos[:,t] + (uxp_full)*dt # random walk in x-direction
-        y_pos[:,t+1] = y_pos[:,t] + uyp*dt # random walk in y-direction
-        uxp = uxp+(-T(0.5)*B*omega_bar*uxp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
-        uyp = uyp+(-T(0.5)*B*omega_bar*uyp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
-        uxp_full = u_mean .+ uxp
-
-            # Reflection particles at boundaries
-
-        # Reflection at upper boundary y>height_domain
-        # doing closed on top open on bottom, as cell detection is open on top,
-        # closed on bottom
-        mag = findall(y_pos[:,t+1].>=space_cells.height_domain) # index of particle with yp>height_domain
-        dim_mag = size(mag) # dimension of array "mag"
-
-        y_mag_succ = y_pos[mag,t+1] # yp at time t+1 corresponding to the index "mag"
-
-        V1 = space_cells.height_domain.*ones(T, dim_mag) 
-
-        ypr_mag = V1*2 .- y_mag_succ  # yp at time t+1 of the reflected particle
-
-        y_pos[mag,t+1]= ypr_mag #replacement of yp>1 with yp of reflected particle
-        uyp[mag] = -uyp[mag] #reflecting velocity
-        bc_interact[mag,t,1] .= true
-
-        # Reflection at lower boundary y<0
-        mag = findall(y_pos[:,t+1].<=0) # index of particle with yp>height_domain
-        dim_mag = size(mag) # dimension of array "mag"
-
-        y_mag_succ = y_pos[mag,t+1] # yp at time t+1 corresponding to the index "mag"
-
-        ypr_mag = - y_mag_succ  # yp at time t+1 of the reflected particle
-
-        y_pos[mag,t+1]= ypr_mag #replacement of yp<0 with yp of reflected particle
-        uyp[mag] = -uyp[mag] #reflecting velocity
-        bc_interact[mag,t,2] .= true
-
-        #bc at end (y=length_domain) of domain
-        end_indicies = x_pos[:,t+1].>=space_cells.length_domain #index of particle with xp>length
-
-        end_x = x_pos[end_indicies,t+1]
-        xpr_end = end_x .- space_cells.length_domain #shifting particles back to begining
-        x_pos[end_indicies,t+1] = xpr_end #replacing x coords
-
-        bc_interact[end_indicies,t,3] .= true
-
-        #bc at start (x=0) of domain
-        start_indicies = x_pos[:,t+1].<=0 #index of particle with xp>length
-
-        xpr_start = space_cells.length_domain .+ x_pos[start_indicies,t+1] 
-        x_pos[start_indicies,t+1] = xpr_start #replacing x coords
-        bc_interact[start_indicies,t,4] .= true
-    end
-    return bc_interact
-end
-
-#reflective bc at begining
-function particle_motion_model_ref_start(x_pos::Array{T,2},y_pos::Array{T,2}, turb_k_e::T, m_params::MotionParams{T}, dt::T, space_cells::CellGrid{T}) where T<:AbstractFloat
-    #for constant kinetic energy
-    omega_bar=m_params.omega_bar
-    C_0=m_params.C_0
-    B=m_params.B
-    u_mean=m_params.u_mean
-    np = size(x_pos)[1]
-    nt = size(x_pos)[2]-1
-    bc_interact = falses(np, nt, 4)
-    #intitial vaules of velocity, maintaining consitancy with energy
-    uxp = randn(T, np).*sqrt.(2/3 .*turb_k_e)
-    uyp = randn(T, np).*sqrt.(2/3 .*turb_k_e)
-    for t=1:nt
-        uxp_full = u_mean .+ uxp
-        x_pos[:,t+1] = x_pos[:,t] + (uxp_full)*dt # random walk in x-direction
-        y_pos[:,t+1] = y_pos[:,t] + uyp*dt # random walk in y-direction
-        uxp = uxp+(-T(0.5)*B*omega_bar*uxp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
-        uyp = uyp+(-T(0.5)*B*omega_bar*uyp)*dt+randn(T, np).*sqrt.(C_0.*turb_k_e.*omega_bar.*dt); 
-
-            # Reflection particles at boundaries
-
-        # Reflection at upper boundary y>height_domain
-        # doing closed on top open on bottom, as cell detection is open on top,
-        # closed on bottom
-        mag = findall(y_pos[:,t+1].>=space_cells.height_domain) # index of particle with yp>height_domain
-        dim_mag = size(mag) # dimension of array "mag"
-
-        y_mag_succ = y_pos[mag,t+1] # yp at time t+1 corresponding to the index "mag"
-
-        V1 = space_cells.height_domain.*ones(T, dim_mag) 
-
-        ypr_mag = V1*2 .- y_mag_succ  # yp at time t+1 of the reflected particle
-
-        y_pos[mag,t+1]= ypr_mag #replacement of yp>1 with yp of reflected particle
-        uyp[mag] = -uyp[mag] #reflecting velocity
-        bc_interact[mag,t,1] .= true
-
-        # Reflection at lower boundary y<0
-        mag = findall(y_pos[:,t+1].<=0) # index of particle with yp>height_domain
-        dim_mag = size(mag) # dimension of array "mag"
-
-        y_mag_succ = y_pos[mag,t+1] # yp at time t+1 corresponding to the index "mag"
-
-        ypr_mag = - y_mag_succ  # yp at time t+1 of the reflected particle
-
-        y_pos[mag,t+1]= ypr_mag #replacement of yp<0 with yp of reflected particle
-        uyp[mag] = -uyp[mag] #reflecting velocity
-        bc_interact[mag,t,2] .= true
-
-        #bc at end (y=length_domain) of domain
-        end_indicies = x_pos[:,t+1].>=space_cells.length_domain #index of particle with xp>length
-
-        end_x = x_pos[end_indicies,t+1]
-        xpr_end = end_x .- space_cells.length_domain #shifting particles back to begining
-        x_pos[end_indicies,t+1] = xpr_end #replacing x coords
-
-        bc_interact[end_indicies,t,3] .= true
-
-        #bc at start (x=0) of domain
-        start_indicies = x_pos[:,t+1].<=0 #index of particle with xp>length
-
-        xpr_start = .- x_pos[start_indicies,t+1] 
-        x_pos[start_indicies,t+1] = xpr_start #replacing x coords
-        uxp[start_indicies] = -uxp[start_indicies] #reflecting velocity
-        bc_interact[start_indicies,t,4] .= true
-    end
-    return bc_interact
-end
-
-
-function PSP_model!(f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2}, turb_k_e::Array{T,2}, bc_interact::BitArray{3}, dt::T, initial_condition::Union{String,Tuple{String,Vararg}},  p_params::PSPParams{T}, psi_mesh::PsiGrid{T}, space_cells::CellGrid{T}, bc_params::BCParams{T}, verbose::Bool=false) where T<:AbstractFloat
-    omega_mean=p_params.omega_bar
-    omega_sigma_2 = p_params.omega_sigma_2
-    T_omega = p_params.T_omega
-    c_phi = p_params.c_phi
-    c_t = p_params.c_t
-    np, nt = size(x_pos)
-    nt-=1
-
-    phip = zeros((2, np, 1+1)) #scalar concentration at these points
-    phi_pm = zeros(Int, 2, np) #pm pairs for each particle
-
-    set_phi_as_ic!(phip,initial_condition,x_pos[:,1],y_pos[:,1],space_cells,1)
-    assign_f_phi!(f_phi,phip[:,:,1], x_pos[:,1], y_pos[:,1], psi_mesh, space_cells,1)
-
-    omegap = zeros(T, np,nt+1) #turbulence frequency
-    omega0_dist = Gamma((omega_mean-p_params.omega_min)^2/(omega_sigma_2),(omega_sigma_2)/(omega_mean-p_params.omega_min)) #this should now match long term distribution of omega
-    omegap[:,1] = rand(T, omega0_dist, np)
-    
-    eval_by_cell!((i,j,cell_particles)-> (assign_pm!(phi_pm, phip[:,:,1], cell_particles, cell_particles)
-    ;assign_f_phi_cell!(f_phi,phip[:,cell_particles,1],psi_mesh,i,j,1);return nothing) , x_pos[:,1], y_pos[:,1], space_cells)
-
-    #time stamp until new p/m bound found, needed to ensure particles are
-    #decorreltaed
-    t_decorr_p = 1 ./(c_t.*omegap[phi_pm[1,:],1]).*rand(T,np)
-    t_decorr_m = 1 ./(c_t.*omegap[phi_pm[2,:],1]).*rand(T,np)
-
-    function test_dot(particle)#used to check if bounding condition is fulfilled
-        la.dot((phip[:,phi_pm[1,particle],1]-phip[:,particle,1]),(phip[:,phi_pm[2,particle],1]-phip[:,particle,1]))
-    end
-
-    for t in 1:nt
-        verbose && print(t,' ')
-        # print(maximum(phip[:,:,t]),' ')
-        #E-M solver for omega 
-        dw = sqrt(dt).*randn(T, np) #random draws
-        omegap[:,t+1] = omegap[:,t]-(omegap[:,t].-omega_mean)./T_omega.*dt + sqrt.((omegap[:,t].-p_params.omega_min).*(2*omega_sigma_2*omega_mean/T_omega)).*dw
-        omegap[:,t+1] = omegap[:,t+1].*(omegap[:,t+1].>=p_params.omega_min)+p_params.omega_min.*(omegap[:,t+1].<=p_params.omega_min) #enforcing positivity
-
-        #stepping the decorrelation times
-        t_decorr_p = t_decorr_p.-dt;
-        t_decorr_m = t_decorr_m.-dt;
-        #finding particles needing new pairs
-        t_p0 = t_decorr_p.<=0
-        t_m0 = t_decorr_m.<=0
-        t_pm0 = t_p0 .& t_m0
-        t_pm_n0 = findall(.!(t_p0 .| t_m0)) # where t_p and t_m>0 
-        t_pm0[t_pm_n0] .|= (test_dot.(t_pm_n0).>0)#add those that fail the boundary condition to be updated
-        t_p0 = xor.(t_p0,t_pm0)
-        t_m0 = xor.(t_m0,t_pm0)
-
-        #split into cells, compute centres/targets, run ODE step
-        eval_by_cell!(function (i,j,cell_particles)
-            (length(cell_particles)==0) && throw(BoundsError(cell_particles))
-            #reassigning particles that completed decorrelation time
-            t_p0_cell = cell_particles[t_p0[cell_particles]]
-            t_m0_cell = cell_particles[t_m0[cell_particles]]
-            t_pm0_cell = cell_particles[t_pm0[cell_particles]]
-            (length(t_p0_cell)>0)&&assign_pm_single!(phi_pm, phip[:,:,1],t_p0_cell, cell_particles, 1)
-            (length(t_m0_cell)>0)&&assign_pm_single!(phi_pm, phip[:,:,1],t_m0_cell, cell_particles, 2)
-            (length(t_pm0_cell)>0)&&assign_pm!(phi_pm, phip[:,:,1], t_pm0_cell, cell_particles)
-            #update pairs to ensure all are within the same bounds
-            pm_check_and_recal_for_cell_change!(phi_pm, phip[:,:,1], cell_particles)
-            return nothing
-        end, x_pos[:,t], y_pos[:,t], space_cells)
-        #reset decorrelation time for particles it had run out on
-        t_decorr_p[t_p0.&t_pm0] = 1 ./(c_t.*omegap[phi_pm[1,t_p0.&t_pm0],t])
-        t_decorr_m[t_m0.&t_pm0] = 1 ./(c_t.*omegap[phi_pm[2,t_m0.&t_pm0],t])
-
-        phi_c = T(0.5).*(phip[:,phi_pm[1,:],1]+phip[:,phi_pm[2,:],1])
-        diffusion = zeros(2,np)
-        diffusion[1,:] = (phip[1,:,1]-phi_c[1,:]).*(exp.(-c_phi.*T(0.5).*omegap[:,t].*dt).-1.0)
-        diffusion[2,:] = (phip[2,:,1]-phi_c[2,:]).*(exp.(-c_phi.*T(0.5).*omegap[:,t].*dt).-1.0)
-        # reaction = dt.*(reaction).*exp.(c_phi.*T(0.5).*omegap[:,t].*dt) #integration of reation term to match diffusion scheme, uncomment if reaction !=0
-        dphi = diffusion 
-
-        # ensuring mean 0 change
-        # generating a random orthonormal basis
-        # is 2-d so genrate a random unit vector from an angle and proceed based
-        # on that
-        angle = 2*pi*rand(1)[1];
-        e_1 = [cos(angle),sin(angle)]
-        handedness = sb.sample([-1,1],1)[1] #randomly choose betwen left or right handed system
-        e_2 = handedness*[e_1[2],-e_1[1]]
-        T_mat=zeros(T,2,2)
-        T_mat[:,1] = e_1  #coord transform matrix
-        T_mat[:,2] = e_2
-        dphi = T_mat\dphi  #transform to new coords
-        #performing adjustment to mean 0
-        corr_factor = zeros(T, 2,np)
-        
-        eval_by_cell!(function (i,j,cell_particles)any(bc_interact[:,t,bc_params.reacting_boundaries], dims=2)[:,1]
-            for phi_i=1:2
-                phi_mean = mean(dphi[phi_i,cell_particles])
-                if phi_mean != 0 #isn't true for empty cells
-                    cell_points_pos = dphi[phi_i,cell_particles].>0
-                    cell_points_neg = dphi[phi_i,cell_particles].<0
-                    phi_pos_mean = mean(cell_points_pos.*dphi[phi_i,cell_particles])
-                    phi_neg_mean = mean((cell_points_neg).*dphi[phi_i,cell_particles])
-                    if phi_mean>0
-                        corr_factor[phi_i,cell_particles]=.-cell_points_pos*(phi_neg_mean./phi_pos_mean) + (1 .- cell_points_pos)
-                    else
-                        corr_factor[phi_i,cell_particles]=.-(cell_points_neg)*(phi_pos_mean./phi_neg_mean) + (1 .- cell_points_neg)
-                    end
-                end
-            end
-            return nothing
-        end, x_pos[:,t], y_pos[:,t], space_cells)
-        dphi = corr_factor.*dphi
-        dphi = T_mat*dphi #return to old coords
-
-        #reaction has to be done after mean zero correction - or it has no effect
-        reaction = zeros(T, 2,np) # body reaction
-        reaction[1,:] = dt.*(p_params.reaction_form[1].(phip[1,:,1],phip[2,:,1]))#.*exp.(c_phi.*T(0.5).*omegap[:,t].*dt) #integration of reation term to match diffusion scheme, uncomment if reaction !=0
-        reaction[2,:] = dt.*(p_params.reaction_form[2].(phip[1,:,1],phip[2,:,1]))
-        dphi .+= reaction
-        phip[:,:,1+1] = phip[:,:,1]+dphi
-        if !(initial_condition == "triple delta")
-            phip[:,:,1+1] = phip[:,:,1+1].*(phip[:,:,1+1].>0) #forcing positive concentration
-        end
-
-        bc_absorbtion!(phip,any(bc_interact[:,t,bc_params.reacting_boundaries], dims=2)[:,1],turb_k_e[any(bc_interact[:,t,bc_params.reacting_boundaries], dims=2)[:,1],t+1],bc_params,1+1) #currently only reacting on bottom bc
-
-        assign_f_phi!(f_phi,phip[:,:,1+1], x_pos[:,t+1], y_pos[:,t+1], psi_mesh, space_cells,t+1)
-        phip[:,:,1] = phip[:,:,2]
-        # print(maximum(phip[:,:,t]),' ')
-    end
-    verbose && println("end")
-    return nothing
-end
-
-#constant turb_k_e
-function PSP_model!(f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2}, turb_k_e::T, bc_interact::BitArray{3}, dt::T, initial_condition::Union{String,Tuple{String,Vararg}},  p_params::PSPParams{T}, psi_mesh::PsiGrid{T}, space_cells::CellGrid{T}, bc_params::BCParams{T}, verbose::Bool=false) where T<:AbstractFloat
-    omega_mean=p_params.omega_bar
-    omega_sigma_2 = p_params.omega_sigma_2
-    T_omega = p_params.T_omega
-    c_phi = p_params.c_phi
-    c_t = p_params.c_t
-    np, nt = size(x_pos)
-    nt-=1
-    precomp_P = min.(bc_params.bc_k.*sqrt.(2*bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
-
-    phip = zeros(T, (2, np, 2)) #scalar concentration at these points
-    phi_pm = zeros(Int, 2, np) #pm pairs for each particle
-
-    set_phi_as_ic!(phip,initial_condition,x_pos[:,1],y_pos[:,1],space_cells,1)
-    assign_f_phi!(f_phi,phip[:,:,1], x_pos[:,1], y_pos[:,1], psi_mesh, space_cells,1)
-
-    omegap = zeros(T, np,nt+1) #turbulence frequency
-    omega0_dist = Gamma((omega_mean-p_params.omega_min)^2/(omega_sigma_2),(omega_sigma_2)/(omega_mean-p_params.omega_min)) #this should now match long term distribution of omega
-    omegap[:,1] = rand(omega0_dist, np).+p_params.omega_min
-    
-    eval_by_cell!((i,j,cell_particles)-> (assign_pm!(phi_pm, phip[:,:,1], cell_particles, cell_particles)
-    ;assign_f_phi_cell!(f_phi,phip[:,cell_particles,1],psi_mesh,i,j,1);return nothing) , x_pos[:,1], y_pos[:,1], space_cells)
-
-    #time stamp until new p/m bound found, needed to ensure particles are
-    #decorreltaed
-    t_decorr_p = 1 ./(c_t.*omegap[phi_pm[1,:],1]).*rand(T,np)
-    t_decorr_m = 1 ./(c_t.*omegap[phi_pm[2,:],1]).*rand(T,np)
-
-    function test_dot(particle)#used to check if bounding condition is fulfilled
-        la.dot((phip[:,phi_pm[1,particle],1]-phip[:,particle,1]),(phip[:,phi_pm[2,particle],1]-phip[:,particle,1]))
-    end
-
-    for t in 1:nt
-        verbose && print(t,' ')
-        #E-M solver for omega 
-        dw = sqrt(dt).*randn(T, np) #random draws
-        omegap[:,t+1] = omegap[:,t]-(omegap[:,t].-omega_mean)./T_omega.*dt + sqrt.((omegap[:,t].-p_params.omega_min).*(2*omega_sigma_2*omega_mean/T_omega)).*dw
-        omegap[:,t+1] = omegap[:,t+1].*(omegap[:,t+1].>=p_params.omega_min)+p_params.omega_min.*(omegap[:,t+1].<=p_params.omega_min) #enforcing positivity
-
-        #stepping the decorrelation times
-        t_decorr_p = t_decorr_p.-dt;
-        t_decorr_m = t_decorr_m.-dt;
-        #finding particles needing new pairs
-        t_p0 = t_decorr_p.<=0
-        t_m0 = t_decorr_m.<=0
-        t_pm0 = t_p0 .& t_m0
-        t_pm_n0 = findall(.!(t_p0 .| t_m0)) # where t_p and t_m>0 
-        t_pm0[t_pm_n0] .|= (test_dot.(t_pm_n0).>0)#add those that fail the boundary condition to be updated
-        t_p0 = xor.(t_p0,t_pm0)
-        t_m0 = xor.(t_m0,t_pm0)
-
-        #split into cells, compute centres/targets, run ODE step
-        eval_by_cell!(function (i,j,cell_particles)
-            (length(cell_particles)==0) && throw(BoundsError(cell_particles))
-            #reassigning particles that completed decorrelation time
-            t_p0_cell = cell_particles[t_p0[cell_particles]]
-            t_m0_cell = cell_particles[t_m0[cell_particles]]
-            t_pm0_cell = cell_particles[t_pm0[cell_particles]]
-            (length(t_p0_cell)>0)&&assign_pm_single!(phi_pm, phip[:,:,1],t_p0_cell, cell_particles, 1)
-            (length(t_m0_cell)>0)&&assign_pm_single!(phi_pm, phip[:,:,1],t_m0_cell, cell_particles, 2)
-            (length(t_pm0_cell)>0)&&assign_pm!(phi_pm, phip[:,:,1], t_pm0_cell, cell_particles)
-            #update pairs to ensure all are within the same bounds
-            pm_check_and_recal_for_cell_change!(phi_pm, phip[:,:,1], cell_particles)
-            return nothing
-        end, x_pos[:,t], y_pos[:,t], space_cells)
-        #reset decorrelation time for particles it had run out on
-        t_decorr_p[t_p0.&t_pm0] = 1 ./(c_t.*omegap[phi_pm[1,t_p0.&t_pm0],t])
-        t_decorr_m[t_m0.&t_pm0] = 1 ./(c_t.*omegap[phi_pm[2,t_m0.&t_pm0],t])
-
-        phi_c = T(0.5).*(phip[:,phi_pm[1,:],1]+phip[:,phi_pm[2,:],1])
-        diffusion = zeros(T, 2,np)
-        diffusion[1,:] = (phip[1,:,1]-phi_c[1,:]).*(exp.(-c_phi.*T(0.5).*omegap[:,1].*dt).-1.0)
-        diffusion[2,:] = (phip[2,:,1]-phi_c[2,:]).*(exp.(-c_phi.*T(0.5).*omegap[:,1].*dt).-1.0)
-        dphi = diffusion 
-        # ensuring mean 0 change
-        # generating a random orthonormal basis
-        # is 2-d so genrate a random unit vector from an angle and proceed based
-        # on that
-        angle = 2*pi*rand(T, 1)[1];
-        e_1 = [cos(angle),sin(angle)]
-        handedness = sb.sample([-1,1],1)[1] #randomly choose betwen left or right handed system
-        e_2 = handedness*[e_1[2],-e_1[1]]
-        T_mat=zeros(2,2)
-        T_mat[:,1] = e_1  #coord transform matrix
-        T_mat[:,2] = e_2
-        dphi = T_mat\dphi  #transform to new coords
-        #performing adjustment to mean 0
-        corr_factor = zeros(T, 2,np)
-        
-        eval_by_cell!(function (i,j,cell_particles)
-            for phi_i=1:2
-                phi_mean = mean(dphi[phi_i,cell_particles])
-                if phi_mean != 0 #isn't true for empty cells
-                    cell_points_pos = dphi[phi_i,cell_particles].>0
-                    cell_points_neg = dphi[phi_i,cell_particles].<0
-                    phi_pos_mean = mean(cell_points_pos.*dphi[phi_i,cell_particles])
-                    phi_neg_mean = mean((cell_points_neg).*dphi[phi_i,cell_particles])
-                    if phi_mean>0
-                        corr_factor[phi_i,cell_particles]=.-cell_points_pos*(phi_neg_mean./phi_pos_mean) + (1 .- cell_points_pos)
-                    else
-                        corr_factor[phi_i,cell_particles]=.-(cell_points_neg)*(phi_pos_mean./phi_neg_mean) + (1 .- cell_points_neg)
-                    end
-                end
-            end
-            return nothing
-        end, x_pos[:,t], y_pos[:,t], space_cells)
-
-        dphi = corr_factor.*dphi
-        dphi = T_mat*dphi #return to old coords
-
-        #reaction has to be done after mean zero correction - or it has no effect
-        reaction = zeros(T, 2,np) # bulk reaction
-        reaction[1,:] = dt.*(p_params.reaction_form[1].(phip[1,:,1],phip[2,:,1]))#.*exp.(c_phi.*T(0.5).*omegap[:,t].*dt) #integration of reation term to match diffusion scheme, uncomment if reaction !=0
-        reaction[2,:] = dt.*(p_params.reaction_form[2].(phip[1,:,1],phip[2,:,1]))
-        dphi .+= reaction
-        phip[:,:,1+1] = phip[:,:,1]+dphi
-        if !(initial_condition == "triple delta")
-            phip[:,:,1+1] = phip[:,:,1+1].*(phip[:,:,1+1].>0) #forcing positive concentration
-        end
-
-        bc_absorbtion!(phip,any(bc_interact[:,t,bc_params.reacting_boundaries], dims=2)[:,1],bc_params,1+1, precomp_P) #currently only reacting on bottom bc
-
-        assign_f_phi!(f_phi,phip[:,:,1+1], x_pos[:,t+1], y_pos[:,t+1], psi_mesh, space_cells,t+1)
-        # print(maximum(phip[:,:,t]),' ')
-        phip[:,:,1] = phip[:,:,2]
-    end
-    verbose && println("end")
-    return nothing
-end
-
-function PSP_model_record_phi_local_diff!(gphi::AbstractArray{T,3},f_phi::AbstractArray{T,5},x_pos::AbstractArray{T,2},y_pos::AbstractArray{T,2}, turb_k_e::T, bc_interact::BitArray{3}, dt::T, initial_condition::Union{String,Tuple{String,Vararg}},  p_params::PSPParams{T}, psi_mesh::PsiGrid{T}, space_cells::CellGrid{T}, bc_params::BCParams{T}, verbose::Bool=false) where T<:AbstractFloat
-    omega_mean=p_params.omega_bar
-    omega_sigma_2 = p_params.omega_sigma_2
-    T_omega = p_params.T_omega
-    c_phi = p_params.c_phi
-    c_t = p_params.c_t
-    np, nt = size(x_pos)
-    nt-=1
-    precomp_P = min.(bc_params.bc_k.*sqrt.(2*bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
-
-    phip = zeros(T, (2, np, 2)) #scalar concentration at these points, 2 is at t+1, 1 is at t
-    phi_pm = zeros(Int, 2, np) #pm pairs for each particle
-    gamma = zeros(T, (2, np))
-
-    set_phi_as_ic!(phip,initial_condition,x_pos[:,1],y_pos[:,1],space_cells,1)
-    assign_f_phi!(f_phi,phip[:,:,1], x_pos[:,1], y_pos[:,1], psi_mesh, space_cells,1)
-
-    omegap = zeros(T, np,nt+1) #turbulence frequency
-    omega0_dist = Gamma((omega_mean-p_params.omega_min)^2/(omega_sigma_2),(omega_sigma_2)/(omega_mean-p_params.omega_min)) #this should now match long term distribution of omega
-    omegap[:,1] = rand(omega0_dist, np).+p_params.omega_min
-    
-    eval_by_cell!((i,j,cell_particles)-> (assign_pm!(phi_pm, phip[:,:,1], cell_particles, cell_particles)
-    ;assign_f_phi_cell!(f_phi,phip[:,cell_particles,1],psi_mesh,i,j,1);return nothing) , x_pos[:,1], y_pos[:,1], space_cells)
-
-    #time stamp until new p/m bound found, needed to ensure particles are
-    #decorreltaed + uniform so doesn't depend on start time 
-    t_decorr_p = 1 ./(c_t.*omegap[phi_pm[1,:],1]).*rand(T,np)
-    t_decorr_m = 1 ./(c_t.*omegap[phi_pm[2,:],1]).*rand(T,np)
-
-    function test_dot(particle)#used to check if bounding condition is fulfilled
-        la.dot((phip[:,phi_pm[1,particle],1]-phip[:,particle,1]),(phip[:,phi_pm[2,particle],1]-phip[:,particle,1]))
-    end
-
-    mean_phi = zeros(T,2,nt+1)
-    mean_phi[:,1] = mean(phip[:,:,1],dims=2)[:,1]
-
-    for t in 1:nt
-        verbose && print(t,' ')
-        #E-M solver for omega 
-        dw = sqrt(dt).*randn(T, np) #random draws
-        omegap[:,t+1] = omegap[:,t]-(omegap[:,t].-omega_mean)./T_omega.*dt + sqrt.((omegap[:,t].-p_params.omega_min).*(2*omega_sigma_2*omega_mean/T_omega)).*dw
-        omegap[:,t+1] = omegap[:,t+1].*(omegap[:,t+1].>=p_params.omega_min)+p_params.omega_min.*(omegap[:,t+1].<=p_params.omega_min) #enforcing positivity
-
-        #stepping the decorrelation times
-        t_decorr_p = t_decorr_p.-dt;
-        t_decorr_m = t_decorr_m.-dt;
-        #finding particles needing new pairs
-        t_p0 = t_decorr_p.<=0
-        t_m0 = t_decorr_m.<=0
-        t_pm0 = t_p0 .& t_m0
-        t_pm_n0 = findall(.!(t_p0 .| t_m0)) # where t_p and t_m>0 
-        t_pm0[t_pm_n0] .|= (test_dot.(t_pm_n0).>0)#add those that fail the boundary condition to be updated
-        t_p0 = xor.(t_p0,t_pm0)
-        t_m0 = xor.(t_m0,t_pm0)
-
-        #split into cells, compute centres/targets, run ODE step
-        eval_by_cell!(function (i,j,cell_particles)
-            (length(cell_particles)==0) && throw(BoundsError(cell_particles))
-            #reassigning particles that completed decorrelation time
-            t_p0_cell = cell_particles[t_p0[cell_particles]]
-            t_m0_cell = cell_particles[t_m0[cell_particles]]
-            t_pm0_cell = cell_particles[t_pm0[cell_particles]]
-            (length(t_p0_cell)>0)&&assign_pm_single!(phi_pm, phip[:,:,1],t_p0_cell, cell_particles, 1)
-            (length(t_m0_cell)>0)&&assign_pm_single!(phi_pm, phip[:,:,1],t_m0_cell, cell_particles, 2)
-            (length(t_pm0_cell)>0)&&assign_pm!(phi_pm, phip[:,:,1], t_pm0_cell, cell_particles)
-            #update pairs to ensure all are within the same bounds
-            pm_check_and_recal_for_cell_change!(phi_pm, phip[:,:,1], cell_particles)
-            return nothing
-        end, x_pos[:,t], y_pos[:,t], space_cells)
-        #reset decorrelation time for particles it had run out on
-        t_decorr_p[t_p0.&t_pm0] = 1 ./(c_t.*omegap[phi_pm[1,t_p0.&t_pm0],t])
-        t_decorr_m[t_m0.&t_pm0] = 1 ./(c_t.*omegap[phi_pm[2,t_m0.&t_pm0],t])
-
-        phi_c = T(0.5).*(phip[:,phi_pm[1,:],1]+phip[:,phi_pm[2,:],1])
-        diffusion = zeros(T, 2,np)
-        diffusion[1,:] = (phip[1,:,1]-phi_c[1,:]).*(exp.(-c_phi.*T(0.5).*omegap[:,t].*dt).-1.0)
-        diffusion[2,:] = (phip[2,:,1]-phi_c[2,:]).*(exp.(-c_phi.*T(0.5).*omegap[:,t].*dt).-1.0)
-        dphi = diffusion
-        #the local diffusion for each particle
-        gamma[1,:] = c_phi.*T(0.5).*omegap[:,t].*(phip[1,:,1]-phi_c[1,:])
-        gamma[2,:] = c_phi.*T(0.5).*omegap[:,t].*(phip[2,:,1]-phi_c[2,:])
-
-        # ensuring mean 0 change
-        # generating a random orthonormal basis
-        # is 2-d so genrate a random unit vector from an angle and proceed based
-        # on that
-        angle = 2*pi*rand(T, 1)[1];
-        e_1 = [cos(angle),sin(angle)]
-        handedness = sb.sample([-1,1],1)[1] #randomly choose betwen left or right handed system
-        e_2 = handedness*[e_1[2],-e_1[1]]
-        T_mat=zeros(2,2)
-        T_mat[:,1] = e_1  #coord transform matrix
-        T_mat[:,2] = e_2
-        dphi = T_mat\dphi  #transform to new coords
-        #performing adjustment to mean 0
-        corr_factor = zeros(T, 2,np)
-        
-        eval_by_cell!(function (i,j,cell_particles)
-            for phi_i=1:2
-                phi_mean = mean(dphi[phi_i,cell_particles])
-                if phi_mean != 0 #isn't true for empty cells
-                    cell_points_pos = dphi[phi_i,cell_particles].>0
-                    cell_points_neg = dphi[phi_i,cell_particles].<0
-                    phi_pos_mean = mean(cell_points_pos.*dphi[phi_i,cell_particles])
-                    phi_neg_mean = mean((cell_points_neg).*dphi[phi_i,cell_particles])
-                    if phi_mean>0
-                        corr_factor[phi_i,cell_particles]=.-cell_points_pos*(phi_neg_mean./phi_pos_mean) + (1 .- cell_points_pos)
-                    else
-                        corr_factor[phi_i,cell_particles]=.-(cell_points_neg)*(phi_pos_mean./phi_neg_mean) + (1 .- cell_points_neg)
-                    end
-                end
-            end
-            return nothing
-        end, x_pos[:,t], y_pos[:,t], space_cells)
-
-        dphi = corr_factor.*dphi
-        dphi = T_mat*dphi #return to old coords
-
-        #reaction has to be done after mean zero correction - or it has no effect
-        reaction = zeros(T, 2,np) # body reaction
-        reaction[1,:] = dt.*(p_params.reaction_form[1].(phip[1,:,1],phip[2,:,1]))#.*exp.(c_phi.*T(0.5).*omegap[:,t].*dt) #integration of reation term to match diffusion scheme, uncomment if reaction !=0
-        reaction[2,:] = dt.*(p_params.reaction_form[2].(phip[1,:,1],phip[2,:,1]))
-        dphi .+= reaction
-        phip[:,:,1+1] = phip[:,:,1]+dphi
-        mean_phi[:,t+1] = mean(phip[:,:,2],dims=2)[:,1]
-        if !(initial_condition == "triple delta")
-            phip[:,:,1+1] = phip[:,:,1+1].*(phip[:,:,1+1].>0) #forcing positive concentration
-        end
-
-        eval_by_cell!(function (i,j,cell_particles)
-            gphi[i,j,t]=mean(gamma[1,cell_particles].*phip[1,cell_particles,1])
-            return nothing
-        end, x_pos[:,t], y_pos[:,t], space_cells)
-        
-        bc_absorbtion!(phip,any(bc_interact[:,t,bc_params.reacting_boundaries], dims=2)[:,1],bc_params,2, precomp_P) #currently only reacting on bottom bc
-        
-        assign_f_phi!(f_phi, phip[:,:,1+1], x_pos[:,t+1], y_pos[:,t+1], psi_mesh, space_cells,t+1)
-        phip[:,:,1] = phip[:,:,2]
-        # print(maximum(phip[:,:,t]),' ')
-    end
-    # plt=plot(permutedims( mean_phi))
-    # display(plt)
-    verbose && println("end")
-    return nothing
-end
-
-function PSP_model_record_reacting_mass!(edge_mean::AbstractArray{T,1}, edge_squared::AbstractArray{T,1}, edge_squared_v::AbstractArray{T,1}, f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2}, turb_k_e::T, bc_interact::BitArray{3}, dt::T, initial_condition::Union{String,Tuple{String,Vararg}},  p_params::PSPParams{T}, psi_mesh::PsiGrid{T}, space_cells::CellGrid{T}, bc_params::BCParams{T}, verbose::Bool=false) where T<:AbstractFloat
-    omega_mean=p_params.omega_bar
-    omega_sigma_2 = p_params.omega_sigma_2
-    T_omega = p_params.T_omega
-    c_phi = p_params.c_phi
-    c_t = p_params.c_t
-    np, nt = size(x_pos)
-    nt-=1
-    precomp_P = min.(bc_params.bc_k*sqrt.(bc_params.B*pi*m_params.omega_bar/(bc_params.D_mol+T(0.5)*bc_params.omega_bar*bc_params.C_0*turb_k_e)),1)
-
-    phip = zeros(T, (2, np, 1+1)) #scalar concentration at these points
-    phi_pm = zeros(Int, 2, np) #pm pairs for each particle
-    set_phi_as_ic!(phip,initial_condition,x_pos[:,1],y_pos[:,1],space_cells,1)
-
-    omegap = zeros(T, np,nt+1) #turbulence frequency
-    omega0_dist = Gamma((omega_mean-p_params.omega_min)^2/(omega_sigma_2),(omega_sigma_2)/(omega_mean-p_params.omega_min)) #this should now match long term distribution of omega
-    omegap[:,1] = rand(omega0_dist, np).+p_params.omega_min
-    
-    eval_by_cell!((i,j,cell_particles)-> (assign_pm!(phi_pm, phip[:,:,1], cell_particles, cell_particles)
-    ;assign_f_phi_cell!(f_phi,phip[:,cell_particles,1],psi_mesh,i,j,1);return nothing) , x_pos[:,1], y_pos[:,1], space_cells)
-
-    #time stamp until new p/m bound found, needed to ensure particles are
-    #decorreltaed
-    t_decorr_p = 1 ./(c_t.*omegap[phi_pm[1,:],1]).*rand(T,np)
-    t_decorr_m = 1 ./(c_t.*omegap[phi_pm[2,:],1]).*rand(T,np)
-
-    function test_dot(particle)#used to check if bounding condition is fulfilled
-        la.dot((phip[:,phi_pm[1,particle],1]-phip[:,particle,1]),(phip[:,phi_pm[2,particle],1]-phip[:,particle,1]))
-    end
-
-    for t in 1:nt
-        verbose && print(t,' ')
-        #E-M solver for omega 
-        dw = sqrt(dt).*randn(T, np) #random draws
-        omegap[:,t+1] = omegap[:,t]-(omegap[:,t].-omega_mean)./T_omega.*dt + sqrt.((omegap[:,t].-p_params.omega_min).*(2*omega_sigma_2*omega_mean/T_omega)).*dw
-        omegap[:,t+1] = omegap[:,t+1].*(omegap[:,t+1].>=p_params.omega_min)+p_params.omega_min.*(omegap[:,t+1].<=p_params.omega_min) #enforcing positivity
-
-        #stepping the decorrelation times
-        t_decorr_p = t_decorr_p.-dt;
-        t_decorr_m = t_decorr_m.-dt;
-        #finding particles needing new pairs
-        t_p0 = t_decorr_p.<=0
-        t_m0 = t_decorr_m.<=0
-        t_pm0 = t_p0 .& t_m0
-        t_pm_n0 = findall(.!(t_p0 .| t_m0)) # where t_p and t_m>0 
-        t_pm0[t_pm_n0] .|= (test_dot.(t_pm_n0).>0)#add those that fail the boundary condition to be updated
-        t_p0 = xor.(t_p0,t_pm0)
-        t_m0 = xor.(t_m0,t_pm0)
-
-        #split into cells, compute centres/targets, run ODE step
-        eval_by_cell!(function (i,j,cell_particles)
-            (length(cell_particles)==0) && throw(BoundsError(cell_particles))
-            #reassigning particles that completed decorrelation time
-            t_p0_cell = cell_particles[t_p0[cell_particles]]
-            t_m0_cell = cell_particles[t_m0[cell_particles]]
-            t_pm0_cell = cell_particles[t_pm0[cell_particles]]
-            (length(t_p0_cell)>0)&&assign_pm_single!(phi_pm, phip[:,:,1],t_p0_cell, cell_particles, 1)
-            (length(t_m0_cell)>0)&&assign_pm_single!(phi_pm, phip[:,:,1],t_m0_cell, cell_particles, 2)
-            (length(t_pm0_cell)>0)&&assign_pm!(phi_pm, phip[:,:,1], t_pm0_cell, cell_particles)
-            #update pairs to ensure all are within the same bounds
-            pm_check_and_recal_for_cell_change!(phi_pm, phip[:,:,1], cell_particles)
-            return nothing
-        end, x_pos[:,t], y_pos[:,t], space_cells)
-        #reset decorrelation time for particles it had run out on
-        t_decorr_p[t_p0.&t_pm0] = 1 ./(c_t.*omegap[phi_pm[1,t_p0.&t_pm0],t])
-        t_decorr_m[t_m0.&t_pm0] = 1 ./(c_t.*omegap[phi_pm[2,t_m0.&t_pm0],t])
-
-        phi_c = T(0.5).*(phip[:,phi_pm[1,:],1]+phip[:,phi_pm[2,:],1])
-        diffusion = zeros(T, 2,np)
-        diffusion[1,:] = (phip[1,:,1]-phi_c[1,:]).*(exp.(-c_phi.*T(0.5).*omegap[:,t].*dt).-1.0)
-        diffusion[2,:] = (phip[2,:,1]-phi_c[2,:]).*(exp.(-c_phi.*T(0.5).*omegap[:,t].*dt).-1.0)
-        # reaction = dt.*(reaction).*exp.(c_phi.*T(0.5).*omegap[:,t].*dt) #integration of reation term to match diffusion scheme, uncomment if reaction !=0
-        dphi = diffusion 
-
-        # ensuring mean 0 change
-        # generating a random orthonormal basis
-        # is 2-d so genrate a random unit vector from an angle and proceed based
-        # on that
-        angle = 2*pi*rand(T, 1)[1];
-        e_1 = [cos(angle),sin(angle)]
-        handedness = sb.sample([-1,1],1)[1] #randomly choose betwen left or right handed system
-        e_2 = handedness*[e_1[2],-e_1[1]]
-        T_mat=zeros(2,2)
-        T_mat[:,1] = e_1  #coord transform matrix
-        T_mat[:,2] = e_2
-        dphi = T_mat\dphi  #transform to new coords
-        #performing adjustment to mean 0
-        corr_factor = zeros(T, 2,np)
-        
-        eval_by_cell!(function (i,j,cell_particles)
-            for phi_i=1:2
-                phi_mean = mean(dphi[phi_i,cell_particles])
-                if phi_mean != 0 #isn't true for empty cells
-                    cell_points_pos = dphi[phi_i,cell_particles].>0
-                    cell_points_neg = dphi[phi_i,cell_particles].<0
-                    phi_pos_mean = mean(cell_points_pos.*dphi[phi_i,cell_particles])
-                    phi_neg_mean = mean((cell_points_neg).*dphi[phi_i,cell_particles])
-                    if phi_mean>0
-                        corr_factor[phi_i,cell_particles]=.-cell_points_pos*(phi_neg_mean./phi_pos_mean) + (1 .- cell_points_pos)
-                    else
-                        corr_factor[phi_i,cell_particles]=.-(cell_points_neg)*(phi_pos_mean./phi_neg_mean) + (1 .- cell_points_neg)
-                    end
-                end
-            end
-            return nothing
-        end, x_pos[:,t], y_pos[:,t], space_cells)
-
-        dphi = corr_factor.*dphi
-        dphi = T_mat*dphi #return to old coords
-
-        #reaction has to be done after mean zero correction - or it has no effect
-        reaction = zeros(T, 2,np) # body reaction
-        reaction[1,:] = dt.*(p_params.reaction_form[1].(phip[1,:,1],phip[2,:,1]))#.*exp.(c_phi.*T(0.5).*omegap[:,t].*dt) #integration of reation term to match diffusion scheme, uncomment if reaction !=0
-        reaction[2,:] = dt.*(p_params.reaction_form[2].(phip[1,:,1],phip[2,:,1]))
-        dphi .+= reaction
-        phip[:,:,1+1] = phip[:,:,1]+dphi
-        if !(initial_condition == "triple delta")
-            phip[:,:,1+1] = phip[:,:,1+1].*(phip[:,:,1+1].>0) #forcing positive concentration
-        end
-        eval_by_cell!(function (i,j,cell_p)
-            if i==1
-                edge_mean[t] += sum(phip[1,cell_p[bc_interact[cell_p,t,2]],1+1]) / (length(cell_p)*space_cells.x_res)
-                # println(length(cell_p),' ', edge_mean[t],' ',sum(phip[1,cell_p[bc_interact[cell_p,t,2]],t+1]) / (length(cell_p)*space_cells.x_res))
-                edge_squared[t] += sum(phip[1,cell_p[bc_interact[cell_p,t,2]],1+1].^2) / (length(cell_p)*space_cells.x_res)
-                if t>=2
-                    v_t=y_pos[cell_p[bc_interact[cell_p,t,2]],t]-y_pos[cell_p[bc_interact[cell_p,t,2]],t-1]
-                    println(maximum(v_t),' ',minimum(v_t))
-                    edge_squared_v[t-1] += sum(v_t.*phip[1,cell_p[bc_interact[cell_p,t,2]],1].^2) / (length(cell_p)*space_cells.x_res)
-                end
-            end
-            return nothing
-        end,  x_pos[:,t], y_pos[:,t], space_cells)
-
-        bc_absorbtion!(phip,any(bc_interact[:,t,bc_params.reacting_boundaries], dims=2)[:,1],bc_params,1+1, precomp_P) #currently only reacting on bottom bc
-
-        assign_f_phi!(f_phi,phip[:,:,1+1], x_pos[:,t+1], y_pos[:,t+1], psi_mesh, space_cells,t+1)
-        # print(maximum(phip[:,:,t]),' ')
-        phip[:,:,1] = phip[:,:,2]
-    end
-    verbose && println("end")
-    return nothing
-end
-
-function make_f_phi_no_PSP!(f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2}, turb_k_e::Array{T,2}, bc_interact::BitArray{3}, initial_condition::Union{String,Tuple{String,Vararg}}, psi_mesh::PsiGrid{T}, space_cells::CellGrid{T}, bc_params::BCParams{T}, verbose::Bool=false) where T<:AbstractFloat
-    np, nt = size(x_pos)
-    nt-=1
-    
-    phip = zeros(T, (2, np, nt+1)) #scalar concentration at these points
-
-    isa(initial_condition, String) && (initial_condition=(initial_condition,))
-    if initial_condition[1] == "Uniform phi_1"
-        set_phi_as_ic_up1!(phip,1)
-    elseif initial_condition[1] == "triple delta"
-        set_phi_as_ic_td!(phip,1)
-    elseif initial_condition[1] == "2 layers"
-        set_phi_as_ic_2l!(phip,y_pos[:,1],space_cells,1)
-    elseif initial_condition[1] == "double delta"
-        set_phi_as_ic_dd!(phip,1)
-    elseif initial_condition[1] == "centred normal"
-        set_phi_as_ic_norm1!(phip,1)
-    elseif initial_condition[1] == "centred 2 normal"
-        set_phi_as_ic_normboth!(phip,1)
-    elseif initial_condition[1] == "double delta difference"
-        set_phi_as_ic_dd_diff!(phip,initial_condition[2],1)
-        throw(ArgumentError("Not a valid intitial condition"))
-    end
-    assign_f_phi!(f_phi,phip[:,:,1], x_pos[:,1], y_pos[:,1], psi_mesh, space_cells,1)
-    
-    for t in 1:nt
-        verbose && print(t,' ')
-        bc_absorbtion!(phip,any(bc_interact[:,t,bc_params.reacting_boundaries], dims=2)[:,1],turb_k_e[any(bc_interact[:,t,bc_params.reacting_boundaries], dims=2)[:,1],t],bc_params,t) #currently only reacting on bottom bc
-        phip[:,:,t+1] = phip[:,:,t]
-        assign_f_phi!(f_phi,phip[:,:,t+1], x_pos[:,t+1], y_pos[:,t+1], psi_mesh, space_cells,t+1)
-    end
-    verbose && println("end")
-    return nothing
-end
-
-#constant turb_k_e TODO:integrate with rewritten api 
-function make_f_phi_no_PSP!(f_phi::Array{T,5},x_pos::Array{T,2},y_pos::Array{T,2}, turb_k_e::T, bc_interact::BitArray{3}, initial_condition::Union{String,Tuple{String,Vararg}}, psi_mesh::PsiGrid{T}, space_cells::CellGrid{T}, bc_params::BCParams{T}, verbose::Bool=false) where T<:AbstractFloat
-    np, nt = size(x_pos)
-    nt-=1
-    precomp_P = min.(bc_params.bc_k.*sqrt.(2*bc_params.B.*pi./(bc_params.C_0.*turb_k_e)),1)
-
-    phip = zeros(T, (2, np, nt+1)) #scalar concentration at these points
-
-    isa(initial_condition, String) && (initial_condition=(initial_condition,))
-    if initial_condition[1] == "Uniform phi_1"
-        set_phi_as_ic_up1!(phip,1)
-    elseif initial_condition[1] == "triple delta"
-        set_phi_as_ic_td!(phip,1)
-    elseif initial_condition[1] == "2 layers"
-        set_phi_as_ic_2l!(phip,y_pos[:,1],space_cells,1)
-    elseif initial_condition[1] == "double delta"
-        set_phi_as_ic_dd!(phip,1)
-    elseif initial_condition[1] == "centred normal"
-        set_phi_as_ic_norm1!(phip,1)
-    elseif initial_condition[1] == "centred 2 normal"
-        set_phi_as_ic_normboth!(phip,1)
-    elseif initial_condition[1] == "double delta difference"
-        set_phi_as_ic_dd_diff!(phip,initial_condition[2],1)
-    elseif initial_condition[1] == "2 layers difference"
-        set_phi_as_ic_2l_diff!(phip,initial_condition[2],y_pos[:,1],space_cells,1)
-    else
-        throw(ArgumentError("Not a valid intitial condition"))
-    end
-    assign_f_phi!(f_phi,phip[:,:,1], x_pos[:,1], y_pos[:,1], psi_mesh, space_cells,1)
-    
-    for t in 1:nt
-        verbose && print(t,' ')
-        bc_absorbtion!(phip, any(bc_interact[:,t,bc_params.reacting_boundaries], dims=2)[:,1], bc_params, t, precomp_P) #currently only reacting on bottom bc
-        phip[:,:,t+1] = phip[:,:,t]
-        assign_f_phi!(f_phi,phip[:,:,t+1], x_pos[:,t+1], y_pos[:,t+1], psi_mesh, space_cells,t+1)
-    end
-    verbose && println("end")
-    return nothing
-end
-
-# end
