@@ -596,7 +596,7 @@ function set_phi_as_ic!(phi_array::Array{TF,3},IC_type::Tuple{String,Vararg},xp:
     elseif IC_type_str == "2 layers difference"
         set_phi_as_ic_2l_diff!(phi_array,IC_type[2],yp,space_cells,t_index)
     elseif IC_type_str == "1 layer transport, 1 layer empty"
-        if length(IC_type>2)
+        if length(IC_type)>2
             set_phi_as_ic_2l_one_empty!(phi_array,IC_type[2],TF(IC_type[3]),yp,space_cells,t_index)
         else
             set_phi_as_ic_2l_one_empty!(phi_array,IC_type[2],TF(0.5),yp,space_cells,t_index)
