@@ -31,7 +31,7 @@ function PSP_model!(foldername::String,turb_k_e::T, nt::Integer, dt::T, np::Inte
     phip = zeros(T, (2, np,1)) #scalar concentration at these points
     phi_pm = zeros(Int, 2, np) #pm pairs for each particle
 
-    f_phi=zeros(T,psi_mesh.psi_partions_num_1, psi_mesh.psi_partions_nu^2/sqrt(p_params.omega_bar^2+p_params.omega_sigma_2)
+    f_phi=zeros(T,psi_mesh.psi_partions_num_1, psi_mesh.psi_partions_nu^2/sqrt(p_params.omega_bar^2+p_params.omega_sigma_2))
 
     omega0_dist =  make_omega_dist(p_params)#this should now match long term distribution of omega
     omegap = Omega(omega0_dist,np,p_params)
