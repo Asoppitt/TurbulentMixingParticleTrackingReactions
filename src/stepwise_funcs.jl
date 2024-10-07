@@ -228,8 +228,8 @@ function PSP_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractArray{T,1},phi
 
     phi_c = T(0.5).*(phip[:,phi_pm[1,:],1]+phip[:,phi_pm[2,:],1])
     diffusion = zeros(T, 2,np)
-    diffusion[1,:] = (phi_c[1,:].-phip[1,:]).*(expm1.(-c_phi.*T(0.5).*omegap[:,1].*dt))
-    diffusion[2,:] = (phi_c[2,:].-phip[2,:]).*(expm1.(-c_phi.*T(0.5).*omegap[:,1].*dt))
+    diffusion[1,:] = (phip[1,:].-phi_c[1,:]).*(expm1.(-c_phi.*T(0.5).*omegap[:,1].*dt))
+    diffusion[2,:] = (phip[2,:].-phi_c[2,:]).*(expm1.(-c_phi.*T(0.5).*omegap[:,1].*dt))
     dphi = diffusion 
     # ensuring mean 0 change
     # generating a random orthonormal basis
