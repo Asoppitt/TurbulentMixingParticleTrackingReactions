@@ -634,7 +634,7 @@ function assign_f_phi_cell!(f_phi_cell::AbstractArray{TF,5},phi_array::AbstractA
                 accum = 0
                 phi2_i = 2
                 for j in phi_array_sort_ind_2
-                    if phi1_2>(psi_mesh.psi_partions_num_2+1)
+                    if phi2_i>(psi_mesh.psi_partions_num_2+1)
                         @warn "particles outside psi_domain/nparticle with value: "*string(phi_array[:,i])*
                             "\n in cell: "*string(cell_row)*","*string(cell_column)*
                             "\n at time-step: "*string(t_index) 
@@ -666,7 +666,7 @@ function assign_f_phi_cell!(f_phi_cell::AbstractArray{TF,5},phi_array::AbstractA
     accum = 0
     phi2_i = 2
     for j in phi_array_sort_ind_2
-        if phi1_i>(psi_mesh.psi_partions_num_1+1)
+        if phi2_i>(psi_mesh.psi_partions_num_1+1)
             @warn "particles outside psi_domain/nparticle with value: "*string(phi_array[:,i])*
                 "\n in cell: "*string(cell_row)*","*string(cell_column)*
                 "\n at time-step: "*string(t_index) 
