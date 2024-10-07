@@ -228,8 +228,8 @@ function PSP_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractArray{T,1},phi
 
     phi_c = T(0.5).*(phip[:,phi_pm[1,:],1]+phip[:,phi_pm[2,:],1])
     diffusion = zeros(T, 2,np)
-    diffusion[1,:] = (phip[1,:]-phi_c[1,:]).*(exp.(-c_phi.*T(0.5).*omegap[:,1].*dt).-1.0)
-    diffusion[2,:] = (phip[2,:]-phi_c[2,:]).*(exp.(-c_phi.*T(0.5).*omegap[:,1].*dt).-1.0)
+    diffusion[1,:] = (phi_c[1,:].-phip[1,:]).*(expm1.(-c_phi.*T(0.5).*omegap[:,1].*dt))
+    diffusion[2,:] = (phi_c[2,:].-phip[2,:]).*(expm1.(-c_phi.*T(0.5).*omegap[:,1].*dt))
     dphi = diffusion 
     # ensuring mean 0 change
     # generating a random orthonormal basis
@@ -258,7 +258,7 @@ function PSP_model_step!(x_pos::AbstractArray{T,1},y_pos::AbstractArray{T,1},phi
                 if phi_mean>0
                     corr_factor[phi_i,cell_particles]=.-cell_points_pos*(phi_neg_mean./phi_pos_mean) + (1 .- cell_points_pos)
                 else
-                    corr_factor[phi_i,cell_particles]=.-(cell_points_neg)*(phi_pos_mean./phi_neg_mean) + (1 .- cell_points_neg)
+                    corr_factor[phi_i,cell_particles]=.-cell_points_neg*(phi_pos_mean./phi_neg_mean) + (1 .- cell_points_neg)
                 end
             end
         end
