@@ -623,41 +623,39 @@ function assign_f_phi_cell!(f_phi_cell::AbstractArray{TF,5},phi_array::AbstractA
     current_i = 0
     for i in phi_array_sort_ind_1
         current_i += 1
-        if phi1_i>(psi_mesh.psi_partions_num_1+1)
-            @warn "particles outside psi_domain/nparticle with value: "*string(phi_array[:,i])*
-                "\n in cell: "*string(cell_row)*","*string(cell_column)*
-                "\n at time-step: "*string(t_index) 
-            break
-        else
-            while phi_array[1,i] > psi_mesh.psi_1[phi1_i]
-                phi_array_sort_ind_2 = phi_array_sort_ind_1[sortperm(phi_array[2,phi_array_sort_ind_1[prev_stop_1:current_i-1]]).+prev_stop_1.-1]
-                accum = 0
-                phi2_i = 2
-                for j in phi_array_sort_ind_2
+        while phi_array[1,i] > psi_mesh.psi_1[phi1_i]
+            phi_array_sort_ind_2 = phi_array_sort_ind_1[sortperm(phi_array[2,phi_array_sort_ind_1[prev_stop_1:current_i-1]]).+prev_stop_1.-1]
+            accum = 0
+            phi2_i = 2
+            for j in phi_array_sort_ind_2
+                while phi_array[2,j] > psi_mesh.psi_2[phi2_i]
+                    f_phi_cell[phi1_i-1, phi2_i-1, cell_row, cell_column, t_index] = float(accum)
+                    accum = 0
+                    phi2_i += 1
                     if phi2_i>(psi_mesh.psi_partions_num_2+1)
                         @warn "particles outside psi_domain/nparticle with value: "*string(phi_array[:,i])*
                             "\n in cell: "*string(cell_row)*","*string(cell_column)*
                             "\n at time-step: "*string(t_index) 
                         break
-                    else
-                        while phi_array[2,j] > psi_mesh.psi_2[phi2_i]
-                            f_phi_cell[phi1_i-1, phi2_i-1, cell_row, cell_column, t_index] = float(accum)
-                            accum = 0
-                            phi2_i += 1
-                        end
-                        accum +=1
                     end
+                    accum +=1
                 end
-                try 
-                    f_phi_cell[phi1_i-1, phi2_i-1, cell_row, cell_column, t_index] = float(accum)
-                catch 
-                    println(phi1_i,' ', phi2_i,' ', cell_row,' ', cell_column,' ', t_index)
-                    println(maximum(phi_array[1,:]),' ',maximum(phi_array[2,:]))
-                    println(psi_mesh.phi_domain)
-                    rethrow()
-                end
-                prev_stop_1 = current_i
-                phi1_i +=1
+            end
+            try 
+                f_phi_cell[phi1_i-1, phi2_i-1, cell_row, cell_column, t_index] = float(accum)
+            catch 
+                println(phi1_i,' ', phi2_i,' ', cell_row,' ', cell_column,' ', t_index)
+                println(maximum(phi_array[1,:]),' ',maximum(phi_array[2,:]))
+                println(psi_mesh.phi_domain)
+                rethrow()
+            end
+            prev_stop_1 = current_i
+            phi1_i +=1
+            if phi1_i>(psi_mesh.psi_partions_num_1+1)
+                @warn "particles outside psi_domain/nparticle with value: "*string(phi_array[:,i])*
+                    "\n in cell: "*string(cell_row)*","*string(cell_column)*
+                    "\n at time-step: "*string(t_index) 
+                break
             end
         end
     end
@@ -666,16 +664,15 @@ function assign_f_phi_cell!(f_phi_cell::AbstractArray{TF,5},phi_array::AbstractA
     accum = 0
     phi2_i = 2
     for j in phi_array_sort_ind_2
-        if phi2_i>(psi_mesh.psi_partions_num_1+1)
-            @warn "particles outside psi_domain/nparticle with value: "*string(phi_array[:,i])*
-                "\n in cell: "*string(cell_row)*","*string(cell_column)*
-                "\n at time-step: "*string(t_index) 
-            break
-        else
-            while phi_array[2,j] > psi_mesh.psi_2[phi2_i]
-                f_phi_cell[phi1_i-1, phi2_i-1, cell_row, cell_column, t_index] = float(accum)
-                accum = 0
-                phi2_i += 1
+        while phi_array[2,j] > psi_mesh.psi_2[phi2_i]
+            f_phi_cell[phi1_i-1, phi2_i-1, cell_row, cell_column, t_index] = float(accum)
+            accum = 0
+            phi2_i += 1
+            if phi2_i>(psi_mesh.psi_partions_num_1+1)
+                @warn "particles outside psi_domain/nparticle with value: "*string(phi_array[:,i])*
+                    "\n in cell: "*string(cell_row)*","*string(cell_column)*
+                    "\n at time-step: "*string(t_index) 
+                break
             end
             accum +=1
         end
